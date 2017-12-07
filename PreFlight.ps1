@@ -1,4 +1,4 @@
-﻿[string] $version = "1.0"
+[string] $version = "1.1"
 <#
 
 .DESCRIPTION
@@ -7,29 +7,31 @@
 
 ###############Disclaimer#####################################################
 
-The sample scripts are not supported under any Microsoft standard support 
+This is a sample script. The sample scripts are not supported under any 
 
-program or service. The sample scripts are provided AS IS without warranty  
+Microsoft standard support program or service. The sample scripts are 
 
-of any kind. Microsoft further disclaims all implied warranties including,  
+provided AS IS without warranty of any kind. Microsoft further disclaims all 
 
-without limitation, any implied warranties of merchantability or of fitness for 
+implied warranties including, without limitation, any implied warranties of 
 
-a particular purpose. The entire risk arising out of the use or performance of  
+merchantability or of fitness for a particular purpose. The entire risk 
 
-the sample scripts and documentation remains with you. In no event shall 
+arising out of the use or performance of the sample scripts and documentation 
 
-Microsoft, its authors, or anyone else involved in the creation, production, or 
+remains with you. In no event shall Microsoft, its authors, or anyone else 
 
-delivery of the scripts be liable for any damages whatsoever (including, 
+involved in the creation, production, or delivery of the scripts be liable 
 
-without limitation, damages for loss of business profits, business interruption, 
+for any damages whatsoever (including, without limitation, damages for loss 
 
-loss of business information, or other pecuniary loss) arising out of the use 
+of business profits, business interruption, loss of business information, or 
 
-of or inability to use the sample scripts or documentation, even if Microsoft 
+other pecuniary loss) arising out of the use of or inability to use the 
 
-has been advised of the possibility of such damages.
+sample scripts or documentation, even if Microsoft has been advised of the 
+
+possibility of such damages.
 
 ###############Disclaimer#####################################################
 
@@ -427,7 +429,7 @@ has been advised of the possibility of such damages.
             $lblDisclaimer.Name = "lblDisclaimer"
             $lblDisclaimer.Text = "Version $version"
             $lblDisclaimer.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-            $lblDisclaimer.Text = "This is a sample script. The sample scripts are not supported under any Microsoft standard support program or service. The sample scripts are provided AS IS without warranty of any kind. Microsoft further disclaims all implied warranties including, without limitation, any implied warranties of merchantability or of fitness for a particular purpose. The entire risk arising out of the use or performance of the sample scripts and documentation remains with you. In no event shall Microsoft, its authors, or anyone else involved in the creation, production, or delivery of the scripts be liable for any damages whatsoever (including, without limitation, damages for loss of business profits, business interruption, loss of business information, or other pecuniary loss) arising out of the use of or inability to use the sample scripts or documentation, even if Microsoft has been advised of the possibility of such damages."
+            $lblDisclaimer.Text = "The Pre-flight tool is a sample script. The sample scripts are not supported under any Microsoft standard support program or service. The sample scripts are provided AS IS without warranty of any kind. Microsoft further disclaims all implied warranties including, without limitation, any implied warranties of merchantability or of fitness for a particular purpose. The entire risk arising out of the use or performance of the sample scripts and documentation remains with you. In no event shall Microsoft, its authors, or anyone else involved in the creation, production, or delivery of the scripts be liable for any damages whatsoever (including, without limitation, damages for loss of business profits, business interruption, loss of business information, or other pecuniary loss) arising out of the use of or inability to use the sample scripts or documentation, even if Microsoft has been advised of the possibility of such damages."
         #endregion
 
         #region lnkBlog
