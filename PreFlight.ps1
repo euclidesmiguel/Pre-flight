@@ -78,7 +78,7 @@ possibility of such damages.
             $Global:isConnected = [bool] ($CloudSession)
         }	
 		else {
-            if ($Global:cloudCred.UserName -eq "dummy") {
+            if ($cloudCred.UserName -eq "dummy") {
                 $result = fnConfigure
                 $continue = ($result -eq [System.Windows.Forms.DialogResult]::OK)
             }
