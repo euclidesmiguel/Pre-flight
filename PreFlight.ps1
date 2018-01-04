@@ -66,11 +66,14 @@ possibility of such damages.
     [bool] $Global:isConnected = $False
     [string] $Global:localExchange = ""
     [string] $Global:serviceDomain = ""
+    [string] $Global:scheduleStartDateTime = ""
+    [string] $Global:scheduleCompleteDateTime = ""
     [string[]] $Global:endPointList = @()
     [string] $Global:migrationEndpoint = ""
     [System.Drawing.Size] $drawingSize = New-Object -TypeName System.Drawing.Size
     [System.Drawing.Point] $drawingPoint = New-Object -TypeName System.Drawing.Point
     [System.Windows.Forms.FormWindowState] $windowState = New-Object System.Windows.Forms.FormWindowState
+    [int] $Global:migrationStrategy = 0
 #endregion
 
 #region fnConnect
@@ -614,15 +617,15 @@ possibility of such damages.
 
 #region fnSchedule
     Function fnSchedule {
-        [int] $migrationStrategy = 0
         [Int] $currentMailbox = 0
         [Int] $totalMailboxes = $onlineTreeView.Nodes.Count
-        [string] $scheduleStartDateTime = ""
-        [string] $scheduleCompleteDateTime = ""
         [string[]] $migrationList = @("EmailAddress")
         [string] $batchName = "$(Get-Date -Format "yyyymmdd-HHmmss")"
         [string] $format = [System.Globalization.CultureInfo]::CurrentCulture.DateTimeFormat.FullDateTimePattern
         [System.Windows.Forms.DialogResult] $result = [System.Windows.Forms.DialogResult]::OK
+        $Global:migrationStrategy = 0
+        $Global:scheduleStartDateTime = ""
+        $Global:scheduleCompleteDateTime = ""
 
         if ($totalMailboxes -gt 0) {
             if ($Global:endPointList.Count -gt 0) {
@@ -659,14 +662,14 @@ possibility of such damages.
                         $btnScheduleOk.TabIndex = 1
                         $btnScheduleOk.Text = "Ok"
                         $btnScheduleOk.Add_Click({
-                            if ($radioStartAutomatic.Checked) {$migrationStrategy = 10}
-                            elseif ($radioStartSchedule.Checked) {$migrationStrategy = 20}
-                            if ($radioCompleteAutomatic.Checked) {$migrationStrategy += 1}
-                            elseif ($radioCompleteSchedule.Checked) {$migrationStrategy += 2}
-                            
+                            if ($radioStartAutomatic.Checked) {$Global:migrationStrategy = 10}
+                            elseif ($radioStartSchedule.Checked) {$Global:migrationStrategy = 20}
+                            if ($radioCompleteAutomatic.Checked) {$Global:migrationStrategy += 1}
+                            elseif ($radioCompleteSchedule.Checked) {$Global:migrationStrategy += 2}
+
                             $Global:migrationEndpoint = $endpointBox.SelectedItem.ToString()
-                            $scheduleStartDateTime = $startSchedulePicker.Value.GetDateTimeFormats('u')
-                            $scheduleCompleteDateTime = $completeSchedulePicker.Value.GetDateTimeFormats('u')
+                            $Global:scheduleStartDateTime = $startSchedulePicker.Value.GetDateTimeFormats('u')
+                            $Global:scheduleCompleteDateTime = $completeSchedulePicker.Value.GetDateTimeFormats('u')
                             $frmSchedule.Close()
                         })
                     #endregion
@@ -876,7 +879,6 @@ possibility of such damages.
                         $frmSchedule.MinimizeBox = $False
                         $frmSchedule.Name = "frmSchedule"
                         $frmSchedule.Text = "Schedule migration"
-                        $frmSchedule.Add_Closed({$frmSchedule = $null})
                         $frmSchedule.Add_Load({
                             $startSchedulePicker.Value = [System.DateTime]::Now.AddDays(1)
                             $completeSchedulePicker.Value = [System.DateTime]::Now.AddDays(2)
@@ -904,19 +906,19 @@ possibility of such damages.
                         }
 
                         $progressBar.Value = 10
-                        Write-Progress -Activity "Creating migration batch $batchName" -Status "Creating migration batch with strategy $migrationStrategy..." -PercentComplete ($progressBar.Value)
-                        $statusLabel.Text = "Creating migration batch with strategy $migrationStrategy..."
+                        Write-Progress -Activity "Creating migration batch $batchName" -Status "Creating migration batch with strategy $Global:migrationStrategy..." -PercentComplete ($progressBar.Value)
+                        $statusLabel.Text = "Creating migration batch with strategy $Global:migrationStrategy..."
 
                         $csvData = [System.Text.Encoding]::ASCII.GetBytes($migrationList)
-                        switch($migrationStrategy) {
+                        switch($Global:migrationStrategy) {
                             0  {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -AutoComplete:$False}
                             1  {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -AutoComplete:$True}
-                            2  {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -AutoComplete:$False -CompleteAfter $scheduleCompleteDateTime}
+                            2  {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -CompleteAfter $Global:scheduleCompleteDateTime}
                             10 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$True  -AutoComplete:$False}
                             11 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$True  -AutoComplete:$True}
-                            12 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$True  -AutoComplete:$False -CompleteAfter $scheduleCompleteDateTime}
-                            21 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -AutoComplete:$True  -StartAfter $scheduleStartDateTime}
-                            22 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -AutoComplete:$False -StartAfter $scheduleStartDateTime -CompleteAfter $scheduleCompleteDateTime}
+                            12 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$True  -CompleteAfter $Global:scheduleCompleteDateTime}
+                            21 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoComplete:$True  -StartAfter $Global:scheduleStartDateTime}
+                            22 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -StartAfter $Global:scheduleStartDateTime -CompleteAfter $Global:scheduleCompleteDateTime}
                         }
 
                         $progressBar.Value = 100
@@ -927,6 +929,7 @@ possibility of such damages.
                         $progressBar.Value = 0
                         Write-Progress -Activity "Creating migration batch $batchName" -Completed
                         $statusLabel.Text = ""
+                        $frmSchedule = $null
                     }
                 #endregion
             }
