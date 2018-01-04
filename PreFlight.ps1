@@ -620,7 +620,7 @@ possibility of such damages.
         [Int] $currentMailbox = 0
         [Int] $totalMailboxes = $onlineTreeView.Nodes.Count
         [string[]] $migrationList = @("EmailAddress")
-        [string] $batchName = "$(Get-Date -Format "yyyymmdd-HHmmss")"
+        [string] $batchName = "$(Get-Date -Format "yyyyMMdd-HHmmss")"
         [string] $format = [System.Globalization.CultureInfo]::CurrentCulture.DateTimeFormat.FullDateTimePattern
         [System.Windows.Forms.DialogResult] $result = [System.Windows.Forms.DialogResult]::OK
         $Global:migrationStrategy = 0
