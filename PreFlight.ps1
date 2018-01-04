@@ -566,7 +566,7 @@ possibility of such damages.
     Function fnWriteReport {
         Param ([PreFlightItem[]] $ReportData)
 
-        [string] $reportFilePath = [System.IO.Path]::GetFullPath("$($Script:MyInvocation.MyCommand.Path)\..\Reports\$(Get-Date -Format "yyyymmdd-HHmmss").csv")
+        [string] $reportFilePath = [System.IO.Path]::GetFullPath("$($Script:MyInvocation.MyCommand.Path)\..\Reports\$(Get-Date -Format "yyyyMMdd-HHmmss").csv")
 
         "primarySMTPAddress,status,errorMessage" | Out-File -FilePath $reportfilePath -Encoding ascii -Force
 
@@ -580,7 +580,7 @@ possibility of such damages.
 #region fnWriteScript
     Function fnWriteScript {
         [Int] $totalMailboxes = $onlineTreeView.Nodes.Count
-        [string] $scriptFileName = "$(Get-Date -Format "yyyymmdd-HHmmss").ps1"
+        [string] $scriptFileName = "$(Get-Date -Format "yyyyMMdd-HHmmss").ps1"
         [System.Windows.Forms.SaveFileDialog] $saveDialog = New-Object -TypeName System.Windows.Forms.SaveFileDialog
 
         if ($totalMailboxes -gt 0) {
