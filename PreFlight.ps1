@@ -668,8 +668,8 @@ possibility of such damages.
                             elseif ($radioCompleteSchedule.Checked) {$Global:migrationStrategy += 2}
 
                             $Global:migrationEndpoint = $endpointBox.SelectedItem.ToString()
-                            $Global:scheduleStartDateTime = $startSchedulePicker.Value.GetDateTimeFormats('u')
-                            $Global:scheduleCompleteDateTime = $completeSchedulePicker.Value.GetDateTimeFormats('u')
+                            $Global:scheduleStartDateTime = [System.TimeZoneInfo]::ConvertTimeToUtc($startSchedulePicker.Value).GetDateTimeFormats('u')
+                            $Global:scheduleCompleteDateTime = [System.TimeZoneInfo]::ConvertTimeToUtc($completeSchedulePicker.Value).GetDateTimeFormats('u')
                             $frmSchedule.Close()
                         })
                     #endregion
