@@ -907,7 +907,7 @@ possibility of such damages.
 
                         $progressBar.Value = 10
                         Write-Progress -Activity "Creating migration batch $batchName" -Status "Creating migration batch with strategy $Global:migrationStrategy..." -PercentComplete ($progressBar.Value)
-                        $statusLabel.Text = "Creating migration batch with strategy $Global:migrationStrategy..."
+                        $statusLabel.Text = "Creating migration batch $batchName with strategy $Global:migrationStrategy..."
 
                         $csvData = [System.Text.Encoding]::ASCII.GetBytes($migrationList)
                         switch($Global:migrationStrategy) {
