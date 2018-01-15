@@ -1,4 +1,4 @@
-[string] $version = "1.4"
+[string] $version = "1.5"
 
 <#
 
@@ -115,12 +115,14 @@ possibility of such damages.
         $onlineTreeView.Nodes.Clear()
         $Global:endPointList.Clear()
 
-        if (-not $Global:isConnected) {fnConnect}
+        if (-not $Global:isConnected) {
+            Write-Host "You are not connected to Exchange yet." -ForegroundColor Red
+        }
         else {
             $progressBar.Value = 25
             $progressBar.Visible = $True
             $statusLabel.Text = "Loading list of users available for migration..."
-            Get-MailUser -ResultSize Unlimited | Where-Object {$_.ExchangeGuid -ne "00000000-0000-0000-0000-000000000000"} | ForEach-Object {
+            Get-MailUser -ResultSize Unlimited | Sort-Object Name | Where-Object {$_.ExchangeGuid -ne "00000000-0000-0000-0000-000000000000"} | ForEach-Object {
                 $onPremisesTreeView.Nodes.Add($_.PrimarySmtpAddress.ToString(), $_.Name)
             }
             $progressBar.Value = 75
@@ -580,7 +582,7 @@ possibility of such damages.
 #region fnWriteScript
     Function fnWriteScript {
         [Int] $totalMailboxes = $onlineTreeView.Nodes.Count
-        [string] $scriptFileName = "$(Get-Date -Format "yyyyMMdd-HHmmss").ps1"
+        [string] $scriptFileName = "$(Get-Date -Format "yyyymmdd-HHmmss").ps1"
         [System.Windows.Forms.SaveFileDialog] $saveDialog = New-Object -TypeName System.Windows.Forms.SaveFileDialog
 
         if ($totalMailboxes -gt 0) {
