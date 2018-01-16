@@ -1,4 +1,4 @@
-[string] $version = "1.5"
+[string] $version = "1.6"
 
 <#
 
@@ -60,9 +60,11 @@ possibility of such damages.
 
 #region global variables
     [Boolean] $Global:configurationFinished = $False
+    [Boolean] $Global:localCredentialChanged = $False
+    [Boolean] $Global:cloudCredentialChanged = $False
     [PSCredential] $Global:localCred = New-Object System.Management.Automation.PSCredential ("dummy", (ConvertTo-SecureString "dummy" -AsPlainText -Force))
     [PSCredential] $Global:cloudCred = New-Object System.Management.Automation.PSCredential ("dummy", (ConvertTo-SecureString "dummy" -AsPlainText -Force))
-    [bool] $Global:isConnected = $False
+    [Boolean] $Global:isConnected = $False
     [string] $Global:localExchange = ""
     [string] $Global:serviceDomain = ""
     [string] $Global:scheduleStartDateTime = ""
@@ -77,7 +79,7 @@ possibility of such damages.
 
 #region fnConnect
     Function fnConnect {
-        [bool] $continue = $True
+        [Boolean] $continue = $True
 
         $progressBar.Value = 10
         $progressBar.Visible = $True
@@ -85,7 +87,7 @@ possibility of such damages.
         $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
         if ($CloudSession) {
 		    Write-Host "Already connected to Exchange Online" -ForegroundColor Blue
-            $Global:isConnected = [bool] ($CloudSession)
+            $Global:isConnected = [Boolean] ($CloudSession)
         }	
 		else {
             if ($Global:cloudCred.UserName -eq "dummy") {
@@ -97,7 +99,7 @@ possibility of such damages.
 			    Import-PSSession $cloudSession -CommandName Get-Mailbox, Get-MailUser, New-MoveRequest, Get-AcceptedDomain, New-MigrationBatch, Get-MigrationEndpoint
 
                 $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
-                $Global:isConnected = [bool] ($CloudSession)
+                $Global:isConnected = [Boolean] ($CloudSession)
 
                 fnLoad
             }
@@ -144,14 +146,13 @@ possibility of such damages.
         if ($cloudSession) {
             Remove-PSSession $cloudSession
         }
-		else {
-			Write-Host "There is no connection to Exchange Online" -ForegroundColor Blue
-		}
     }
 #endregion
 
 #region fnConfigure
     Function fnConfigure {
+        $Global:localCredentialChanged = $False
+        $Global:cloudCredentialChanged = $False
         [System.Windows.Forms.Form] $frmConfig = New-Object -TypeName System.Windows.Forms.Form
         [System.Windows.Forms.GroupBox] $grpLocal = New-Object -TypeName System.Windows.Forms.GroupBox
         [System.Windows.Forms.GroupBox] $grpOnline = New-Object -TypeName System.Windows.Forms.GroupBox
@@ -175,6 +176,7 @@ possibility of such damages.
             $drawingSize.Width = 179
             $txtLocalUser.Location = $drawingPoint
             $txtLocalUser.Size = $drawingSize
+            $txtLocalUser.add_TextChanged({$Global:localCredentialChanged = $True})
         #endregion
 
         #region txtLocalPassword
@@ -185,6 +187,7 @@ possibility of such damages.
             $txtLocalPassword.Location = $drawingPoint
             $txtLocalPassword.Size = $drawingSize
             $txtLocalPassword.UseSystemPasswordChar = $True
+            $txtLocalPassword.Add_TextChanged({$Global:localCredentialChanged = $True})
         #endregion
 
         #region txtLocalExchange
@@ -203,6 +206,11 @@ possibility of such damages.
             $drawingSize.Width = 179
             $txtCloudUser.Location = $drawingPoint
             $txtCloudUser.Size = $drawingSize
+            $txtCloudUser.Add_TextChanged({
+                $Global:cloudCredentialChanged = $True
+                if (($txtcloudUser.Text -ne "") -and ($txtcloudPassword.Text -ne "")) {$btnOk.Enabled = $True}
+                else {$btnOk.Enabled = $False}
+            })
         #endregion
 
         #region txtCloudPassword
@@ -213,6 +221,11 @@ possibility of such damages.
             $txtCloudPassword.Location = $drawingPoint
             $txtCloudPassword.Size = $drawingSize
             $txtCloudPassword.UseSystemPasswordChar = $True
+            $txtCloudPassword.Add_TextChanged({
+                $Global:cloudCredentialChanged = $True
+                if (($txtcloudUser.Text -ne "") -and ($txtcloudPassword.Text -ne "")) {$btnOk.Enabled = $True}
+                else {$btnOk.Enabled = $False}
+            })
         #endregion
 
         #region lblLocalUser
@@ -289,11 +302,12 @@ possibility of such damages.
             $btnOk.Text = "Ok"
             $btnOk.UseVisualStyleBackColor = $True
             $btnOk.DialogResult = [System.Windows.Forms.DialogResult]::OK
+            $btnOk.Enabled = $False
             $btnOk.Add_Click({
-                $Global:localCred = New-Object System.Management.Automation.PSCredential ($txtLocalUser.Text, (ConvertTo-SecureString $txtLocalPassword.Text -AsPlainText -Force))
-                $Global:cloudCred = New-Object System.Management.Automation.PSCredential ($txtcloudUser.Text, (ConvertTo-SecureString $txtcloudPassword.Text -AsPlainText -Force))
+                if ($Global:localCredentialChanged -and ($txtLocalUser.Text -ne "") -and ($txtLocalPassword.Text -ne "")) {$Global:localCred = New-Object System.Management.Automation.PSCredential ($txtLocalUser.Text, (ConvertTo-SecureString $txtLocalPassword.Text -AsPlainText -Force))}
+                if ($Global:cloudCredentialChanged -and ($txtcloudUser.Text -ne "") -and ($txtcloudPassword.Text -ne "")) {$Global:cloudCred = New-Object System.Management.Automation.PSCredential ($txtcloudUser.Text, (ConvertTo-SecureString $txtcloudPassword.Text -AsPlainText -Force))}
+                if ($Global:cloudCred.UserName -ne "dummy") {$Global:configurationFinished = $True}
                 $Global:localExchange = $txtLocalExchange.Text
-                $Global:configurationFinished = $True
                 $frmConfig.Close()
             })
         #endregion
@@ -327,7 +341,7 @@ possibility of such damages.
             $grpLocal.Name = "grpLocal"
             $grpLocal.Size = $drawingSize
             $grpLocal.TabStop = $False
-            $grpLocal.Text = "Exchange on-premises (only for pre-flight)"
+            $grpLocal.Text = "Exchange on-premises (optional - used only for pre-flight)"
         #endregion
 
         #region grpOnline
