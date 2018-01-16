@@ -62,7 +62,6 @@ possibility of such damages.
     [Boolean] $Global:configurationFinished = $False
     [PSCredential] $Global:localCred = New-Object System.Management.Automation.PSCredential ("dummy", (ConvertTo-SecureString "dummy" -AsPlainText -Force))
     [PSCredential] $Global:cloudCred = New-Object System.Management.Automation.PSCredential ("dummy", (ConvertTo-SecureString "dummy" -AsPlainText -Force))
-    [bool] $Global:loadCloudMailboxes = $False
     [bool] $Global:isConnected = $False
     [string] $Global:localExchange = ""
     [string] $Global:serviceDomain = ""
@@ -328,7 +327,7 @@ possibility of such damages.
             $grpLocal.Name = "grpLocal"
             $grpLocal.Size = $drawingSize
             $grpLocal.TabStop = $False
-            $grpLocal.Text = "Exchange on-premises"
+            $grpLocal.Text = "Exchange on-premises (only for pre-flight)"
         #endregion
 
         #region grpOnline
@@ -579,364 +578,392 @@ possibility of such damages.
     }
 #endregion
 
+#region fnGetSchedule
+    Function fnGetSchedule {
+        $Global:migrationStrategy = 0
+        $Global:scheduleStartDateTime = ""
+        $Global:scheduleCompleteDateTime = ""
+
+        [System.Windows.Forms.Form] $frmSchedule = New-Object -TypeName System.Windows.Forms.Form
+        [System.Windows.Forms.Button] $btnScheduleOk = New-Object -TypeName System.Windows.Forms.Button
+        [System.Windows.Forms.Button] $btnScheduleCancel = New-Object -TypeName System.Windows.Forms.Button
+        [System.Windows.Forms.DateTimePicker] $startSchedulePicker = New-Object -TypeName System.Windows.Forms.DateTimePicker
+        [System.Windows.Forms.DateTimePicker] $completeSchedulePicker = New-Object -TypeName System.Windows.Forms.DateTimePicker
+        [System.Windows.Forms.GroupBox] $grpStart = New-Object -TypeName System.Windows.Forms.GroupBox
+        [System.Windows.Forms.GroupBox] $grpComplete = New-Object -TypeName System.Windows.Forms.GroupBox
+        [System.Windows.Forms.RadioButton] $radioStartManual = New-Object -TypeName System.Windows.Forms.RadioButton
+        [System.Windows.Forms.RadioButton] $radioStartAutomatic = New-Object -TypeName System.Windows.Forms.RadioButton
+        [System.Windows.Forms.RadioButton] $radioStartSchedule = New-Object -TypeName System.Windows.Forms.RadioButton
+        [System.Windows.Forms.RadioButton] $radioCompleteManual = New-Object -TypeName System.Windows.Forms.RadioButton
+        [System.Windows.Forms.RadioButton] $radioCompleteAutomatic = New-Object -TypeName System.Windows.Forms.RadioButton
+        [System.Windows.Forms.RadioButton] $radioCompleteSchedule = New-Object -TypeName System.Windows.Forms.RadioButton
+        [System.Windows.Forms.Label] $lblSelectEndpoint = New-Object -TypeName System.Windows.Forms.Label
+        [System.Windows.Forms.ComboBox] $endpointBox = New-Object -TypeName System.Windows.Forms.ComboBox
+
+        $grpStart.SuspendLayout()
+        $grpComplete.SuspendLayout()
+        $frmSchedule.SuspendLayout()
+
+        #region btnScheduleOk
+            $drawingPoint.X = 538
+            $drawingPoint.Y = 166
+            $drawingSize.Height = 23
+            $drawingSize.Width = 75
+            $btnScheduleOk.DialogResult = [System.Windows.Forms.DialogResult]::OK
+            $btnScheduleOk.Location = $drawingPoint
+            $btnScheduleOk.Name = "btnScheduleOk"
+            $btnScheduleOk.Size = $drawingSize
+            $btnScheduleOk.TabIndex = 1
+            $btnScheduleOk.Text = "Ok"
+            $btnScheduleOk.Add_Click({
+                if ($radioStartAutomatic.Checked) {$Global:migrationStrategy = 10}
+                elseif ($radioStartSchedule.Checked) {$Global:migrationStrategy = 20}
+                if ($radioCompleteAutomatic.Checked) {$Global:migrationStrategy += 1}
+                elseif ($radioCompleteSchedule.Checked) {$Global:migrationStrategy += 2}
+
+                $Global:migrationEndpoint = $endpointBox.SelectedItem.ToString()
+                $Global:scheduleStartDateTime = [System.TimeZoneInfo]::ConvertTimeToUtc($startSchedulePicker.Value).GetDateTimeFormats('u')
+                $Global:scheduleCompleteDateTime = [System.TimeZoneInfo]::ConvertTimeToUtc($completeSchedulePicker.Value).GetDateTimeFormats('u')
+                $frmSchedule.Close()
+            })
+        #endregion
+        
+        #region btnScheduleCancel
+            $drawingPoint.X = 619
+            $drawingPoint.Y = 166
+            $drawingSize.Height = 23
+            $drawingSize.Width = 75
+            $btnScheduleCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+            $btnScheduleCancel.Location = $drawingPoint
+            $btnScheduleCancel.Name = "btnScheduleCancel"
+            $btnScheduleCancel.Size = $drawingSize
+            $btnScheduleCancel.TabIndex = 2
+            $btnScheduleCancel.Text = "Cancel"
+        #endregion
+
+        #region lblSelectEndpoint
+            $drawingPoint.X = 113
+            $drawingPoint.Y = 139
+            $drawingSize.Height = 13
+            $drawingSize.Width = 228
+            $lblSelectEndpoint.AutoSize = $True
+            $lblSelectEndpoint.Location = $drawingPoint
+            $lblSelectEndpoint.Name = "lblSelectEndpoint"
+            $lblSelectEndpoint.Size = $drawingSize
+            $lblSelectEndpoint.Text = "Select the migrantion endpoint you wan to use:"
+        #endregion
+
+        #region endpointBox
+            $drawingPoint.X = 366
+            $drawingPoint.Y = 136
+            $drawingSize.Height = 31
+            $drawingSize.Width = 328
+            $endpointBox.Location = $drawingPoint
+            $endpointBox.Size = $drawingSize
+            $endpointBox.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+            $endpointBox.FormattingEnabled = $True
+            $endpointBox.Name = "endpointBox"
+            $endpointBox.TabIndex = 2
+        #endregion
+
+        #region startSchedulePicker
+            $drawingPoint.X = 43
+            $drawingPoint.Y = 88
+            $drawingSize.Height = 20
+            $drawingSize.Width = 279
+            $startSchedulePicker.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
+            $startSchedulePicker.Location = $drawingPoint
+            $startSchedulePicker.Name = "startSchedulePicker"
+            $startSchedulePicker.Size = $drawingSize
+            $startSchedulePicker.TabIndex = 0
+            $startSchedulePicker.CustomFormat = $format
+        #endregion
+
+        #region completeSchedulePicker
+            $drawingPoint.X = 43
+            $drawingPoint.Y = 88
+            $drawingSize.Height = 20
+            $drawingSize.Width = 279
+            $completeSchedulePicker.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
+            $completeSchedulePicker.Location = $drawingPoint
+            $completeSchedulePicker.Name = "completeSchedulePicker"
+            $completeSchedulePicker.Size = $drawingSize
+            $completeSchedulePicker.TabIndex = 0
+            $completeSchedulePicker.CustomFormat = $format
+        #endregion
+
+        #region radioStartManual
+            $drawingPoint.X = 18
+            $drawingPoint.Y = 19
+            $drawingSize.Height = 17
+            $drawingSize.Width = 70
+            $radioStartManual.Location = $drawingPoint
+            $radioStartManual.Name = "radioStartManual"
+            $radioStartManual.Size = $drawingSize
+            $radioStartManual.TabIndex = 4
+            $radioStartManual.TabStop = $True
+            $radioStartManual.Text = "Manually"
+        #endregion
+
+        #region radioStartAutomatic
+            $drawingPoint.X = 18
+            $drawingPoint.Y = 42
+            $drawingSize.Height = 17
+            $drawingSize.Width = 90
+            $radioStartAutomatic.Location = $drawingPoint
+            $radioStartAutomatic.Name = "radioStartAutomatic"
+            $radioStartAutomatic.Size = $drawingSize
+            $radioStartAutomatic.TabIndex = 4
+            $radioStartAutomatic.TabStop = $True
+            $radioStartAutomatic.Text = "Automatically"
+        #endregion
+
+        #region radioStartSchedule
+            $drawingPoint.X = 18
+            $drawingPoint.Y = 65
+            $drawingSize.Height = 17
+            $drawingSize.Width = 218
+            $radioStartSchedule.Location = $drawingPoint
+            $radioStartSchedule.Name = "radioStartSchedule"
+            $radioStartSchedule.Size = $drawingSize
+            $radioStartSchedule.TabIndex = 4
+            $radioStartSchedule.TabStop = $True
+            $radioStartSchedule.Text = "Start the batch automatically after time:"
+            $radioStartSchedule.Checked = $True
+            $radioStartSchedule.Add_CheckedChanged({
+                if ($radioStartSchedule.Checked) {
+                    $radioCompleteManual.Checked = $False
+                    $radioCompleteManual.Enabled = $False
+                }
+                else {
+                    $radioCompleteManual.Enabled = $True
+                }
+            })
+        #endregion
+
+        #region radioCompleteManual
+            $drawingPoint.X = 18
+            $drawingPoint.Y = 19
+            $drawingSize.Height = 17
+            $drawingSize.Width = 70
+            $radioCompleteManual.Enabled = $False
+            $radioCompleteManual.Checked = $False
+            $radioCompleteManual.Location = $drawingPoint
+            $radioCompleteManual.Name = "radioCompleteManual"
+            $radioCompleteManual.Size = $drawingSize
+            $radioCompleteManual.TabIndex = 4
+            $radioCompleteManual.TabStop = $True
+            $radioCompleteManual.Text = "Manually"
+        #endregion
+
+        #region radioCompleteAutomatic
+            $drawingPoint.X = 18
+            $drawingPoint.Y = 42
+            $drawingSize.Height = 17
+            $drawingSize.Width = 90
+            $radioCompleteAutomatic.Location = $drawingPoint
+            $radioCompleteAutomatic.Name = "radioCompleteAutomatic"
+            $radioCompleteAutomatic.Size = $drawingSize
+            $radioCompleteAutomatic.TabIndex = 4
+            $radioCompleteAutomatic.TabStop = $True
+            $radioCompleteAutomatic.Text = "Automatically"
+        #endregion
+
+        #region radioCompleteSchedule
+            $drawingPoint.X = 18
+            $drawingPoint.Y = 65
+            $drawingSize.Height = 17
+            $drawingSize.Width = 245
+            $radioCompleteSchedule.Location = $drawingPoint
+            $radioCompleteSchedule.Name = "radioCompleteSchedule"
+            $radioCompleteSchedule.Size = $drawingSize
+            $radioCompleteSchedule.TabIndex = 4
+            $radioCompleteSchedule.TabStop = $True
+            $radioCompleteSchedule.Text = "Complete the batch automatically after time:"
+            $radioCompleteSchedule.Checked = $True
+        #endregion
+
+        #region grpStart
+            $drawingPoint.X = 13
+            $drawingPoint.Y = 13
+            $drawingSize.Height = 115
+            $drawingSize.Width = 328
+            $grpStart.Controls.Add($radioStartManual)
+            $grpStart.Controls.Add($radioStartAutomatic)
+            $grpStart.Controls.Add($radioStartSchedule)
+            $grpStart.Controls.Add($startSchedulePicker)
+            $grpStart.Location = $drawingPoint
+            $grpStart.Name = "grpStart"
+            $grpStart.Size = $drawingSize
+            $grpStart.TabStop = $False
+            $grpStart.Text = "Please select the preferred option to start the batch"
+        #endregion
+
+        #region grpComplete
+            $drawingPoint.X = 366
+            $drawingPoint.Y = 13
+            $drawingSize.Height = 115
+            $drawingSize.Width = 328
+            $grpComplete.Controls.Add($radioCompleteManual)
+            $grpComplete.Controls.Add($radioCompleteAutomatic)
+            $grpComplete.Controls.Add($radioCompleteSchedule)
+            $grpComplete.Controls.Add($completeSchedulePicker)
+            $grpComplete.Location = $drawingPoint
+            $grpComplete.Name = "grpComplete"
+            $grpComplete.Size = $drawingSize
+            $grpComplete.TabStop = $False
+            $grpComplete.Text = "Please select the preferred option to start the batch"
+        #endregion
+
+        #region frmSchedule
+            $drawingSize.Height = 240
+            $drawingSize.Width = 722
+            $frmSchedule.Size = $drawingSize
+            $frmSchedule.AcceptButton = $btnScheduleOk
+            $frmSchedule.CancelButton = $btnScheduleCancel
+            $frmSchedule.Controls.Add($grpStart)
+            $frmSchedule.Controls.Add($grpComplete)
+            $frmSchedule.Controls.Add($lblSelectEndpoint)
+            $frmSchedule.Controls.Add($endpointBox)
+            $frmSchedule.Controls.Add($btnScheduleOk)
+            $frmSchedule.Controls.Add($btnScheduleCancel)
+            $frmSchedule.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
+            $frmSchedule.ControlBox = $False
+            $frmSchedule.MaximizeBox = $False
+            $frmSchedule.MinimizeBox = $False
+            $frmSchedule.Name = "frmSchedule"
+            $frmSchedule.Text = "Schedule migration"
+            $frmSchedule.Add_Load({
+                $startSchedulePicker.Value = [System.DateTime]::Now.AddDays(1)
+                $completeSchedulePicker.Value = [System.DateTime]::Now.AddDays(2)
+                $Global:endPointList | ForEach-Object {
+                    if ($_ -ne "") {$endpointBox.Items.Add($_)}
+                }
+                $endpointBox.SelectedIndex = 0
+            })
+            $frmSchedule.ResumeLayout($False)
+            $frmSchedule.PerformLayout()
+
+            $result = $frmSchedule.ShowDialog()
+            $frmSchedule = $null
+        #endregion
+        return $result
+    }
+#endregion
+
 #region fnWriteScript
     Function fnWriteScript {
+        [Int] $currentMailbox = 0
         [Int] $totalMailboxes = $onlineTreeView.Nodes.Count
-        [string] $scriptFileName = "$(Get-Date -Format "yyyymmdd-HHmmss").ps1"
+        [string] $scriptFileName = "$(Get-Date -Format "yyyyMMdd-HHmmss").ps1"
+        [string] $batchName = "$(Get-Date -Format "yyyyMMdd-HHmmss")"
+        [string] $format = [System.Globalization.CultureInfo]::CurrentCulture.DateTimeFormat.FullDateTimePattern
+        [string] $scriptFilePath = ""
+        [System.Windows.Forms.DialogResult] $result = [System.Windows.Forms.DialogResult]::OK
         [System.Windows.Forms.SaveFileDialog] $saveDialog = New-Object -TypeName System.Windows.Forms.SaveFileDialog
 
         if ($totalMailboxes -gt 0) {
-            $saveDialog.InitialDirectory = [System.IO.Path]::GetFullPath("$($Script:MyInvocation.MyCommand.Path)\..\Scripts")
-            $saveDialog.Filter = "Windows PowerShell Script (*.ps1)|*.ps1|All files (*.*)|*.*"
-            $saveDialog.FileName = $scriptFileName
-            if ($saveDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-                [string] $scriptFilePath = $saveDialog.FileName
-
-                "$('$')localExchange = '$Global:localExchange'" | Out-File -FilePath $scriptFilePath -Encoding ascii -Force
-                '$localCred = Get-Credential -Message "Enter your local credential"' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                '$cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                'if ($cloudSession) {' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                '    $disconnectAtTheEnd = $False' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-	    	    '    Write-Host "Already connected to Exchange Online" -ForegroundColor Blue' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                '}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-    		    'else {' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                '    $disconnectAtTheEnd = $True' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                '    $cloudCred = Get-Credential -Message "Enter your cloud credential"' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-	    	    '    $cloudSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://ps.outlook.com/powershell" -AllowRedirection -Credential $cloudCred -Authentication Basic' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-		        '    Import-PSSession $cloudSession -CommandName New-MoveRequest' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                '}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                $onlineTreeView.Nodes | ForEach-Object {
-                    "New-MoveRequest -Remote -RemoteHostName $('$')localExchange -RemoteCredential $('$')localCred -Identity $($_.Name) -TargetDeliveryDomain $Global:serviceDomain" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+            if ($Global:endPointList.Count -gt 0) {
+                $result = fnGetSchedule
+                $saveDialog.InitialDirectory = [System.IO.Path]::GetFullPath("$($Script:MyInvocation.MyCommand.Path)\..\Scripts")
+                $saveDialog.Filter = "Windows PowerShell Script (*.ps1)|*.ps1|All files (*.*)|*.*"
+                $saveDialog.FileName = $scriptFileName
+                if ($result = [System.Windows.Forms.DialogResult]::OK) {
+                    if ($saveDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+                        $scriptFilePath = $saveDialog.FileName
+                        '$cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Force
+                        'if ($cloudSession) {' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        '    $disconnectAtTheEnd = $False' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+	    	            '    Write-Host "Already connected to Exchange Online" -ForegroundColor Blue' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        '}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+    		            'else {' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        '    $disconnectAtTheEnd = $True' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        '    $cloudCred = Get-Credential -Message "Enter your cloud credential"' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+	    	            '    $cloudSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://ps.outlook.com/powershell" -AllowRedirection -Credential $cloudCred -Authentication Basic' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+		                '    Import-PSSession $cloudSession -CommandName New-MigrationBatch' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        '}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        '$migrationList = "EmailAddress"' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        $onlineTreeView.Nodes | ForEach-Object {
+                            "$('$migrationList += "`r`n')$($_.Name)""" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        }
+                        '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        '$csvData = [System.Text.Encoding]::ASCII.GetBytes($migrationList)' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        switch($Global:migrationStrategy) {
+                            0  {"New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $('$csvData') -AutoStart:$('$False') -AutoComplete:$('$False')" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append}
+                            1  {"New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $('$csvData') -AutoStart:$('$False') -AutoComplete:$('$True')" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append}
+                            2  {"New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $('$csvData') -AutoStart:$('$False') -CompleteAfter '$Global:scheduleCompleteDateTime'" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append}
+                            10 {"New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $('$csvData') -AutoStart:$('$True')  -AutoComplete:$('$False')" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append}
+                            11 {"New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $('$csvData') -AutoStart:$('$True')  -AutoComplete:$('$True')" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append}
+                            12 {"New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $('$csvData') -AutoStart:$('$True')  -CompleteAfter '$Global:scheduleCompleteDateTime'" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append}
+                            21 {"New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $('$csvData') -AutoComplete:$('$True')  -StartAfter '$Global:scheduleStartDateTime'" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append}
+                            22 {"New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $('$csvData') -StartAfter '$Global:scheduleStartDateTime' -CompleteAfter '$Global:scheduleCompleteDateTime'" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append}
+                        }
+                        '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        'if ($disconnectAtTheEnd) {Remove-PSSession $cloudSession}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append -NoNewline
+                    }
                 }
-                '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                'if ($disconnectAtTheEnd) {Remove-PSSession $cloudSession}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+            }
+            else {
+                [System.Windows.Forms.MessageBox]::Show("You need to register a migration`r`nendpoint before continuing.", "Missing migration endpoint", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                Start-Process "https://technet.microsoft.com/library/jj218611(v=exchg.160).aspx"
             }
         }
     }
 #endregion
 
-#region fnSchedule
-    Function fnSchedule {
+#region fnMigrate
+    Function fnMigrate {
         [Int] $currentMailbox = 0
         [Int] $totalMailboxes = $onlineTreeView.Nodes.Count
-        [string[]] $migrationList = @("EmailAddress")
+        [string] $migrationList = "EmailAddress"
         [string] $batchName = "$(Get-Date -Format "yyyyMMdd-HHmmss")"
         [string] $format = [System.Globalization.CultureInfo]::CurrentCulture.DateTimeFormat.FullDateTimePattern
         [System.Windows.Forms.DialogResult] $result = [System.Windows.Forms.DialogResult]::OK
-        $Global:migrationStrategy = 0
-        $Global:scheduleStartDateTime = ""
-        $Global:scheduleCompleteDateTime = ""
 
         if ($totalMailboxes -gt 0) {
             if ($Global:endPointList.Count -gt 0) {
-                #region form
-                    [System.Windows.Forms.Form] $frmSchedule = New-Object -TypeName System.Windows.Forms.Form
-                    [System.Windows.Forms.Button] $btnScheduleOk = New-Object -TypeName System.Windows.Forms.Button
-                    [System.Windows.Forms.Button] $btnScheduleCancel = New-Object -TypeName System.Windows.Forms.Button
-                    [System.Windows.Forms.DateTimePicker] $startSchedulePicker = New-Object -TypeName System.Windows.Forms.DateTimePicker
-                    [System.Windows.Forms.DateTimePicker] $completeSchedulePicker = New-Object -TypeName System.Windows.Forms.DateTimePicker
-                    [System.Windows.Forms.GroupBox] $grpStart = New-Object -TypeName System.Windows.Forms.GroupBox
-                    [System.Windows.Forms.GroupBox] $grpComplete = New-Object -TypeName System.Windows.Forms.GroupBox
-                    [System.Windows.Forms.RadioButton] $radioStartManual = New-Object -TypeName System.Windows.Forms.RadioButton
-                    [System.Windows.Forms.RadioButton] $radioStartAutomatic = New-Object -TypeName System.Windows.Forms.RadioButton
-                    [System.Windows.Forms.RadioButton] $radioStartSchedule = New-Object -TypeName System.Windows.Forms.RadioButton
-                    [System.Windows.Forms.RadioButton] $radioCompleteManual = New-Object -TypeName System.Windows.Forms.RadioButton
-                    [System.Windows.Forms.RadioButton] $radioCompleteAutomatic = New-Object -TypeName System.Windows.Forms.RadioButton
-                    [System.Windows.Forms.RadioButton] $radioCompleteSchedule = New-Object -TypeName System.Windows.Forms.RadioButton
-                    [System.Windows.Forms.Label] $lblSelectEndpoint = New-Object -TypeName System.Windows.Forms.Label
-                    [System.Windows.Forms.ComboBox] $endpointBox = New-Object -TypeName System.Windows.Forms.ComboBox
+                $result = fnGetSchedule
 
-                    $grpStart.SuspendLayout()
-                    $grpComplete.SuspendLayout()
-                    $frmSchedule.SuspendLayout()
+                if ($result = [System.Windows.Forms.DialogResult]::OK) {
+                    $progressBar.Value = 0
+                    $progressBar.Visible = $True
+                    Write-Progress -Activity "Creating migration batch $batchName" -Status "Preparing list of users..." -PercentComplete ($progressBar.Value)
+                    $statusLabel.Text = "Preparing list of users..."
 
-                    #region btnScheduleOk
-                        $drawingPoint.X = 538
-                        $drawingPoint.Y = 166
-                        $drawingSize.Height = 23
-                        $drawingSize.Width = 75
-                        $btnScheduleOk.DialogResult = [System.Windows.Forms.DialogResult]::OK
-                        $btnScheduleOk.Location = $drawingPoint
-                        $btnScheduleOk.Name = "btnScheduleOk"
-                        $btnScheduleOk.Size = $drawingSize
-                        $btnScheduleOk.TabIndex = 1
-                        $btnScheduleOk.Text = "Ok"
-                        $btnScheduleOk.Add_Click({
-                            if ($radioStartAutomatic.Checked) {$Global:migrationStrategy = 10}
-                            elseif ($radioStartSchedule.Checked) {$Global:migrationStrategy = 20}
-                            if ($radioCompleteAutomatic.Checked) {$Global:migrationStrategy += 1}
-                            elseif ($radioCompleteSchedule.Checked) {$Global:migrationStrategy += 2}
-
-                            $Global:migrationEndpoint = $endpointBox.SelectedItem.ToString()
-                            $Global:scheduleStartDateTime = [System.TimeZoneInfo]::ConvertTimeToUtc($startSchedulePicker.Value).GetDateTimeFormats('u')
-                            $Global:scheduleCompleteDateTime = [System.TimeZoneInfo]::ConvertTimeToUtc($completeSchedulePicker.Value).GetDateTimeFormats('u')
-                            $frmSchedule.Close()
-                        })
-                    #endregion
-        
-                    #region btnScheduleCancel
-                        $drawingPoint.X = 619
-                        $drawingPoint.Y = 166
-                        $drawingSize.Height = 23
-                        $drawingSize.Width = 75
-                        $btnScheduleCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
-                        $btnScheduleCancel.Location = $drawingPoint
-                        $btnScheduleCancel.Name = "btnScheduleCancel"
-                        $btnScheduleCancel.Size = $drawingSize
-                        $btnScheduleCancel.TabIndex = 2
-                        $btnScheduleCancel.Text = "Cancel"
-                    #endregion
-
-                    #region lblSelectEndpoint
-                        $drawingPoint.X = 113
-                        $drawingPoint.Y = 139
-                        $drawingSize.Height = 13
-                        $drawingSize.Width = 228
-                        $lblSelectEndpoint.AutoSize = $True
-                        $lblSelectEndpoint.Location = $drawingPoint
-                        $lblSelectEndpoint.Name = "lblSelectEndpoint"
-                        $lblSelectEndpoint.Size = $drawingSize
-                        $lblSelectEndpoint.Text = "Select the migrantion endpoint you wan to use:"
-                    #endregion
-
-                    #region endpointBox
-                        $drawingPoint.X = 366
-                        $drawingPoint.Y = 136
-                        $drawingSize.Height = 31
-                        $drawingSize.Width = 328
-                        $endpointBox.Location = $drawingPoint
-                        $endpointBox.Size = $drawingSize
-                        $endpointBox.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-                        $endpointBox.FormattingEnabled = $True
-                        $endpointBox.Name = "endpointBox"
-                        $endpointBox.TabIndex = 2
-                    #endregion
-
-                    #region startSchedulePicker
-                        $drawingPoint.X = 43
-                        $drawingPoint.Y = 88
-                        $drawingSize.Height = 20
-                        $drawingSize.Width = 279
-                        $startSchedulePicker.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
-                        $startSchedulePicker.Location = $drawingPoint
-                        $startSchedulePicker.Name = "startSchedulePicker"
-                        $startSchedulePicker.Size = $drawingSize
-                        $startSchedulePicker.TabIndex = 0
-                        $startSchedulePicker.CustomFormat = $format
-                    #endregion
-
-                    #region completeSchedulePicker
-                        $drawingPoint.X = 43
-                        $drawingPoint.Y = 88
-                        $drawingSize.Height = 20
-                        $drawingSize.Width = 279
-                        $completeSchedulePicker.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
-                        $completeSchedulePicker.Location = $drawingPoint
-                        $completeSchedulePicker.Name = "completeSchedulePicker"
-                        $completeSchedulePicker.Size = $drawingSize
-                        $completeSchedulePicker.TabIndex = 0
-                        $completeSchedulePicker.CustomFormat = $format
-                    #endregion
-
-                    #region radioStartManual
-                        $drawingPoint.X = 18
-                        $drawingPoint.Y = 19
-                        $drawingSize.Height = 17
-                        $drawingSize.Width = 70
-                        $radioStartManual.Location = $drawingPoint
-                        $radioStartManual.Name = "radioStartManual"
-                        $radioStartManual.Size = $drawingSize
-                        $radioStartManual.TabIndex = 4
-                        $radioStartManual.TabStop = $True
-                        $radioStartManual.Text = "Manually"
-                    #endregion
-
-                    #region radioStartAutomatic
-                        $drawingPoint.X = 18
-                        $drawingPoint.Y = 42
-                        $drawingSize.Height = 17
-                        $drawingSize.Width = 90
-                        $radioStartAutomatic.Location = $drawingPoint
-                        $radioStartAutomatic.Name = "radioStartAutomatic"
-                        $radioStartAutomatic.Size = $drawingSize
-                        $radioStartAutomatic.TabIndex = 4
-                        $radioStartAutomatic.TabStop = $True
-                        $radioStartAutomatic.Text = "Automatically"
-                    #endregion
-
-                    #region radioStartSchedule
-                        $drawingPoint.X = 18
-                        $drawingPoint.Y = 65
-                        $drawingSize.Height = 17
-                        $drawingSize.Width = 218
-                        $radioStartSchedule.Location = $drawingPoint
-                        $radioStartSchedule.Name = "radioStartSchedule"
-                        $radioStartSchedule.Size = $drawingSize
-                        $radioStartSchedule.TabIndex = 4
-                        $radioStartSchedule.TabStop = $True
-                        $radioStartSchedule.Text = "Start the batch automatically after time:"
-                        $radioStartSchedule.Checked = $True
-                        $radioStartSchedule.Add_CheckedChanged({
-                            if ($radioStartSchedule.Checked) {
-                                $radioCompleteManual.Checked = $False
-                                $radioCompleteManual.Enabled = $False
-                            }
-                            else {
-                                $radioCompleteManual.Enabled = $True
-                            }
-                        })
-                    #endregion
-
-                    #region radioCompleteManual
-                        $drawingPoint.X = 18
-                        $drawingPoint.Y = 19
-                        $drawingSize.Height = 17
-                        $drawingSize.Width = 70
-                        $radioCompleteManual.Enabled = $False
-                        $radioCompleteManual.Checked = $False
-                        $radioCompleteManual.Location = $drawingPoint
-                        $radioCompleteManual.Name = "radioCompleteManual"
-                        $radioCompleteManual.Size = $drawingSize
-                        $radioCompleteManual.TabIndex = 4
-                        $radioCompleteManual.TabStop = $True
-                        $radioCompleteManual.Text = "Manually"
-                    #endregion
-
-                    #region radioCompleteAutomatic
-                        $drawingPoint.X = 18
-                        $drawingPoint.Y = 42
-                        $drawingSize.Height = 17
-                        $drawingSize.Width = 90
-                        $radioCompleteAutomatic.Location = $drawingPoint
-                        $radioCompleteAutomatic.Name = "radioCompleteAutomatic"
-                        $radioCompleteAutomatic.Size = $drawingSize
-                        $radioCompleteAutomatic.TabIndex = 4
-                        $radioCompleteAutomatic.TabStop = $True
-                        $radioCompleteAutomatic.Text = "Automatically"
-                    #endregion
-
-                    #region radioCompleteSchedule
-                        $drawingPoint.X = 18
-                        $drawingPoint.Y = 65
-                        $drawingSize.Height = 17
-                        $drawingSize.Width = 245
-                        $radioCompleteSchedule.Location = $drawingPoint
-                        $radioCompleteSchedule.Name = "radioCompleteSchedule"
-                        $radioCompleteSchedule.Size = $drawingSize
-                        $radioCompleteSchedule.TabIndex = 4
-                        $radioCompleteSchedule.TabStop = $True
-                        $radioCompleteSchedule.Text = "Complete the batch automatically after time:"
-                        $radioCompleteSchedule.Checked = $True
-                    #endregion
-
-                    #region grpStart
-                        $drawingPoint.X = 13
-                        $drawingPoint.Y = 13
-                        $drawingSize.Height = 115
-                        $drawingSize.Width = 328
-                        $grpStart.Controls.Add($radioStartManual)
-                        $grpStart.Controls.Add($radioStartAutomatic)
-                        $grpStart.Controls.Add($radioStartSchedule)
-                        $grpStart.Controls.Add($startSchedulePicker)
-                        $grpStart.Location = $drawingPoint
-                        $grpStart.Name = "grpStart"
-                        $grpStart.Size = $drawingSize
-                        $grpStart.TabStop = $False
-                        $grpStart.Text = "Please select the preferred option to start the batch"
-                    #endregion
-
-                    #region grpComplete
-                        $drawingPoint.X = 366
-                        $drawingPoint.Y = 13
-                        $drawingSize.Height = 115
-                        $drawingSize.Width = 328
-                        $grpComplete.Controls.Add($radioCompleteManual)
-                        $grpComplete.Controls.Add($radioCompleteAutomatic)
-                        $grpComplete.Controls.Add($radioCompleteSchedule)
-                        $grpComplete.Controls.Add($completeSchedulePicker)
-                        $grpComplete.Location = $drawingPoint
-                        $grpComplete.Name = "grpComplete"
-                        $grpComplete.Size = $drawingSize
-                        $grpComplete.TabStop = $False
-                        $grpComplete.Text = "Please select the preferred option to start the batch"
-                    #endregion
-
-                    #region frmSchedule
-                        $drawingSize.Height = 240
-                        $drawingSize.Width = 722
-                        $frmSchedule.Size = $drawingSize
-                        $frmSchedule.AcceptButton = $btnScheduleOk
-                        $frmSchedule.CancelButton = $btnScheduleCancel
-                        $frmSchedule.Controls.Add($grpStart)
-                        $frmSchedule.Controls.Add($grpComplete)
-                        $frmSchedule.Controls.Add($lblSelectEndpoint)
-                        $frmSchedule.Controls.Add($endpointBox)
-                        $frmSchedule.Controls.Add($btnScheduleOk)
-                        $frmSchedule.Controls.Add($btnScheduleCancel)
-                        $frmSchedule.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
-                        $frmSchedule.ControlBox = $False
-                        $frmSchedule.MaximizeBox = $False
-                        $frmSchedule.MinimizeBox = $False
-                        $frmSchedule.Name = "frmSchedule"
-                        $frmSchedule.Text = "Schedule migration"
-                        $frmSchedule.Add_Load({
-                            $startSchedulePicker.Value = [System.DateTime]::Now.AddDays(1)
-                            $completeSchedulePicker.Value = [System.DateTime]::Now.AddDays(2)
-                            $Global:endPointList | ForEach-Object {
-                                if ($_ -ne "") {$endpointBox.Items.Add($_)}
-                            }
-                            $endpointBox.SelectedIndex = 0
-                        })
-                        $frmSchedule.ResumeLayout($False)
-                        $frmSchedule.PerformLayout()
-
-                        $result = $frmSchedule.ShowDialog()
-                    #endregion
-                #endregion
-
-                #region schedule migration
-                    if ($result = [System.Windows.Forms.DialogResult]::OK) {
-                        $progressBar.Value = 0
-                        $progressBar.Visible = $True
-                        Write-Progress -Activity "Creating migration batch $batchName" -Status "Preparing list of users..." -PercentComplete ($progressBar.Value)
-                        $statusLabel.Text = "Preparing list of users..."
-
-                        $onlineTreeView.Nodes | ForEach-Object {
-                            $migrationList += "`n$($_.Name)"
-                        }
-
-                        $progressBar.Value = 10
-                        Write-Progress -Activity "Creating migration batch $batchName" -Status "Creating migration batch with strategy $Global:migrationStrategy..." -PercentComplete ($progressBar.Value)
-                        $statusLabel.Text = "Creating migration batch $batchName with strategy $Global:migrationStrategy..."
-
-                        $csvData = [System.Text.Encoding]::ASCII.GetBytes($migrationList)
-                        switch($Global:migrationStrategy) {
-                            0  {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -AutoComplete:$False}
-                            1  {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -AutoComplete:$True}
-                            2  {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -CompleteAfter $Global:scheduleCompleteDateTime}
-                            10 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$True  -AutoComplete:$False}
-                            11 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$True  -AutoComplete:$True}
-                            12 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$True  -CompleteAfter $Global:scheduleCompleteDateTime}
-                            21 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoComplete:$True  -StartAfter $Global:scheduleStartDateTime}
-                            22 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -StartAfter $Global:scheduleStartDateTime -CompleteAfter $Global:scheduleCompleteDateTime}
-                        }
-
-                        $progressBar.Value = 100
-                        Write-Progress -Activity "Creating migration batch $batchName" -Status "Done!" -PercentComplete ($progressBar.Value)
-                        $statusLabel.Text = "Done creating migration batch $batchName!"
-
-                        $progressBar.Visible = $False
-                        $progressBar.Value = 0
-                        Write-Progress -Activity "Creating migration batch $batchName" -Completed
-                        $statusLabel.Text = ""
-                        $frmSchedule = $null
+                    $onlineTreeView.Nodes | ForEach-Object {
+                        $migrationList += "`r`n$($_.Name)"
                     }
-                #endregion
+
+                    $progressBar.Value = 10
+                    Write-Progress -Activity "Creating migration batch $batchName" -Status "Creating migration batch with strategy $Global:migrationStrategy..." -PercentComplete ($progressBar.Value)
+                    $statusLabel.Text = "Creating migration batch $batchName with strategy $Global:migrationStrategy..."
+
+                    $csvData = [System.Text.Encoding]::ASCII.GetBytes($migrationList)
+                    switch($Global:migrationStrategy) {
+                        0  {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -AutoComplete:$False}
+                        1  {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -AutoComplete:$True}
+                        2  {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$False -CompleteAfter $Global:scheduleCompleteDateTime}
+                        10 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$True  -AutoComplete:$False}
+                        11 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$True  -AutoComplete:$True}
+                        12 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoStart:$True  -CompleteAfter $Global:scheduleCompleteDateTime}
+                        21 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -AutoComplete:$True  -StartAfter $Global:scheduleStartDateTime}
+                        22 {New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $csvData -StartAfter $Global:scheduleStartDateTime -CompleteAfter $Global:scheduleCompleteDateTime}
+                    }
+
+                    $progressBar.Value = 100
+                    Write-Progress -Activity "Creating migration batch $batchName" -Status "Done!" -PercentComplete ($progressBar.Value)
+                    $statusLabel.Text = "Done creating migration batch $batchName!"
+
+                    $progressBar.Visible = $False
+                    $progressBar.Value = 0
+                    Write-Progress -Activity "Creating migration batch $batchName" -Completed
+                    $statusLabel.Text = ""
+                }
             }
             else {
-                [System.Windows.Forms.MessageBox]::Show("You need to register a migration`nendpoint before continuing.", "Missing migration endpoint", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                [System.Windows.Forms.MessageBox]::Show("You need to register a migration`r`nendpoint before continuing.", "Missing migration endpoint", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
                 Start-Process "https://technet.microsoft.com/library/jj218611(v=exchg.160).aspx"
             }
         }
@@ -1216,7 +1243,7 @@ possibility of such damages.
         $menuItemFileMigrate.Name = "menuItemFileMigrate"
         $menuItemFileMigrate.Size = $drawingSize
         $menuItemFileMigrate.Text = "&Migrate"
-        $menuItemFileMigrate.Add_Click({fnSchedule})
+        $menuItemFileMigrate.Add_Click({fnMigrate})
     #endregion
 
     #region menuItemFileSpace1
@@ -1367,7 +1394,7 @@ possibility of such damages.
         $toolbarBtnMigrate.Name = "toolbarBtnMigrate"
         $toolbarBtnMigrate.Size = $drawingSize
         $toolbarBtnMigrate.Text = "Migrate"
-        $toolbarBtnMigrate.Add_Click({fnSchedule})
+        $toolbarBtnMigrate.Add_Click({fnMigrate})
     #endregion
 
     #region toolbarSeparator1
