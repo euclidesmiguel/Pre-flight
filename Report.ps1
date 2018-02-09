@@ -1,6 +1,6 @@
 param ([PSCredential] $Credential = (New-Object System.Management.Automation.PSCredential ("dummy", (ConvertTo-SecureString "dummy" -AsPlainText -Force))))
 
-[string] $version = "0.5"
+[string] $version = "0.6"
 
 <#
 
