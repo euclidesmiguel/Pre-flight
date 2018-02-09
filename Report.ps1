@@ -343,8 +343,6 @@ possibility of such damages.
             $grpOnline.Controls.Add($txtCloudUser)
             $grpOnline.Controls.Add($lblCloudPassword)
             $grpOnline.Controls.Add($txtCloudPassword)
-            $grpOnline.Controls.Add($btnOk)
-            $grpOnline.Controls.Add($btnCancel)
             $grpOnline.Location = $drawingPoint
             $grpOnline.Name = "grpOnline"
             $grpOnline.Size = $drawingSize
@@ -354,8 +352,6 @@ possibility of such damages.
         #region frmConfig
             $drawingSize.Height = 141
             $drawingSize.Width = 360
-            $frmConfig.AcceptButton = $btnOk
-            $frmConfig.CancelButton = $btnCancel
             $frmConfig.ClientSize = $drawingSize
             $frmConfig.ControlBox = $False
             $frmConfig.Controls.Add($grpOnline)
@@ -369,6 +365,8 @@ possibility of such damages.
             $frmConfig.ShowIcon = $False
             $frmConfig.ShowInTaskbar = $False
             $frmConfig.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterParent
+            $frmConfig.AcceptButton = $btnOk
+            $frmConfig.CancelButton = $btnCancel
             $frmConfig.Add_Closed({$frmConfig = $null})
             $frmConfig.Add_Load({
                 If ($Global:configurationFinished) {
