@@ -1,4 +1,4 @@
-[string] $version = "1.6"
+[string] $version = "1.7"
 
 <#
 
@@ -49,11 +49,81 @@ possibility of such damages.
 #endregion
 
 #region custom types
-    Add-Type -Language VisualBasic -TypeDefinition @"
+    Add-Type -Language VisualBasic -ReferencedAssemblies ("System.Collections", "System.Windows.Forms") -TypeDefinition @"
+    Imports System.Collections
+    Imports System.Windows.Forms
+
     Public Class PreFlightItem
         Public primarySMTPAddress As String
         Public status As String
         Public errorMessage As String
+    End Class
+
+    Public Class ListViewColumnSorter
+        Implements System.Collections.IComparer
+
+        Private ColumnToSort As Integer
+        Private OrderOfSort As SortOrder
+        Private ObjectCompare As CaseInsensitiveComparer
+
+        Public Sub New()
+            ' Initialize the column to '0'.
+            ColumnToSort = 0
+
+            ' Initialize the sort order to 'none'.
+            OrderOfSort = SortOrder.None
+
+            ' Initialize the CaseInsensitiveComparer object.
+            ObjectCompare = New CaseInsensitiveComparer()
+        End Sub
+
+        Public Function Compare(ByVal x As Object, ByVal y As Object) As Integer Implements IComparer.Compare
+            Dim compareResult As Integer
+            Dim listviewX As ListViewItem
+            Dim listviewY As ListViewItem
+
+            ' Cast the objects to be compared to ListViewItem objects.
+            listviewX = CType(x, ListViewItem)
+            listviewY = CType(y, ListViewItem)
+
+            ' Compare the two items.
+            compareResult = ObjectCompare.Compare(listviewX.SubItems(ColumnToSort).Text, listviewY.SubItems(ColumnToSort).Text)
+
+            ' Calculate the correct return value based on the object 
+            ' comparison.
+            If (OrderOfSort = SortOrder.Ascending) Then
+                ' Ascending sort is selected, return typical result of 
+                ' compare operation.
+                Return compareResult
+            ElseIf (OrderOfSort = SortOrder.Descending) Then
+                ' Descending sort is selected, return negative result of 
+                ' compare operation.
+                Return (-compareResult)
+            Else
+                ' Return '0' to indicate that they are equal.
+                Return 0
+            End If
+        End Function
+
+        Public Property SortColumn() As Integer
+            Set(ByVal Value As Integer)
+                ColumnToSort = Value
+            End Set
+
+            Get
+                Return ColumnToSort
+            End Get
+        End Property
+
+        Public Property Order() As SortOrder
+            Set(ByVal Value As SortOrder)
+                OrderOfSort = Value
+            End Set
+
+            Get
+                Return OrderOfSort
+            End Get
+        End Property
     End Class
 "@
 #endregion
@@ -84,26 +154,37 @@ possibility of such damages.
         $progressBar.Value = 10
         $progressBar.Visible = $True
         $statusLabel.Text = "Connecting to Exchange Online..."
-        $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
+
+        $cloudSession = Get-PSSession | Where-Object {(($_.ComputerName -eq "outlook.office365.com") -or ($_.ComputerName -eq "ps.outlook.com")) -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
         if ($CloudSession) {
 		    Write-Host "Already connected to Exchange Online" -ForegroundColor Blue
             $Global:isConnected = [Boolean] ($CloudSession)
-        }	
-		else {
+        }
+        else {
             if ($Global:cloudCred.UserName -eq "dummy") {
                 $result = fnConfigure
                 $continue = ($result -eq [System.Windows.Forms.DialogResult]::OK)
             }
             if ($continue) {
-			    $cloudSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://ps.outlook.com/powershell" -AllowRedirection -Credential $Global:cloudCred -Authentication Basic
-			    Import-PSSession $cloudSession -CommandName Get-Mailbox, Get-MailUser, New-MoveRequest, Get-AcceptedDomain, New-MigrationBatch, Get-MigrationEndpoint
+                if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -eq 0) {
+			        $cloudSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://ps.outlook.com/powershell" -AllowRedirection -Credential $Global:cloudCred -Authentication Basic
+			        Import-PSSession $cloudSession -CommandName Get-Mailbox, Get-MailUser, New-MoveRequest, Get-AcceptedDomain, New-MigrationBatch, Get-MigrationEndpoint
 
-                $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
-                $Global:isConnected = [Boolean] ($CloudSession)
+                    $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
+                    $Global:isConnected = [Boolean] ($CloudSession)
+                }
+                else {
+                    Connect-EXOPSSession -UserPrincipalName $Global:cloudCred.UserName
 
+                    $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "outlook.office365.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
+                    $Global:isConnected = [Boolean] ($CloudSession)
+                }
+            }
+            if ($Global:isConnected) {
                 fnLoad
             }
-		}
+        }
+
         $progressBar.Visible = $False
         $statusLabel.Text = ""
         return $continue
@@ -112,8 +193,8 @@ possibility of such damages.
 
 #region fnLoad
     Function fnLoad {
-        $onPremisesTreeView.Nodes.Clear()
-        $onlineTreeView.Nodes.Clear()
+        $onPremisesListView.Items.Clear()
+        $onlineListView.Items.Clear()
         $Global:endPointList.Clear()
 
         if (-not $Global:isConnected) {
@@ -124,7 +205,9 @@ possibility of such damages.
             $progressBar.Visible = $True
             $statusLabel.Text = "Loading list of users available for migration..."
             Get-MailUser -ResultSize Unlimited | Sort-Object Name | Where-Object {$_.ExchangeGuid -ne "00000000-0000-0000-0000-000000000000"} | ForEach-Object {
-                $onPremisesTreeView.Nodes.Add($_.PrimarySmtpAddress.ToString(), $_.Name)
+                $listViewItem = New-Object -TypeName System.Windows.Forms.ListViewItem([System.String[]](@($_.DisplayName, $_.PrimarySmtpAddress)), -1)
+                $ListViewItem.Checked = $False
+                $onPremisesListView.Items.AddRange([System.Windows.Forms.ListViewItem[]](@($listViewItem)))
             }
             $progressBar.Value = 75
             $statusLabel.Text = "Discovering service domain..."
@@ -176,7 +259,11 @@ possibility of such damages.
             $drawingSize.Width = 179
             $txtLocalUser.Location = $drawingPoint
             $txtLocalUser.Size = $drawingSize
-            $txtLocalUser.add_TextChanged({$Global:localCredentialChanged = $True})
+            $txtLocalUser.add_TextChanged({
+                $Global:cloudCredentialChanged = $True
+                if (($txtcloudUser.Text -ne "") -and ($txtcloudPassword.Text -ne "")) {$btnOk.Enabled = $True}
+                else {$btnOk.Enabled = $False}
+            })
         #endregion
 
         #region txtLocalPassword
@@ -226,6 +313,11 @@ possibility of such damages.
                 if (($txtcloudUser.Text -ne "") -and ($txtcloudPassword.Text -ne "")) {$btnOk.Enabled = $True}
                 else {$btnOk.Enabled = $False}
             })
+            if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -gt 0) {
+                $txtCloudPassword.Enabled = $False
+                $txtCloudPassword.Visible = $False
+                $txtCloudPassword.Text = "dummy"
+            }
         #endregion
 
         #region lblLocalUser
@@ -261,7 +353,6 @@ possibility of such damages.
             $lblLocalExchange.Location = $drawingPoint
             $lblLocalExchange.Name = "lblLocalExchange"
             $lblLocalExchange.Size = $drawingSize
-            $lblLocalExchange.TabIndex = 0
             $lblLocalExchange.Text = "MRS proxy FQDN"
         #endregion
 
@@ -274,7 +365,6 @@ possibility of such damages.
             $lblCloudUser.Location = $drawingPoint
             $lblCloudUser.Name = "lblCloudUser"
             $lblCloudUser.Size = $drawingSize
-            $lblCloudUser.TabIndex = 0
             $lblCloudUser.Text = "User name (user@domain)"
         #endregion
 
@@ -287,8 +377,11 @@ possibility of such damages.
             $lblCloudPassword.Location = $drawingPoint
             $lblCloudPassword.Name = "lblCloudPassword"
             $lblCloudPassword.Size = $drawingSize
-            $lblCloudPassword.TabIndex = 0
             $lblCloudPassword.Text = "Password"
+            if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -gt 0) {
+                $lblCloudPassword.Enabled = $False
+                $lblCloudPassword.Visible = $False
+            }
         #endregion
 
         #region btnOk
@@ -535,19 +628,19 @@ possibility of such damages.
         [Int] $currentMailbox = 0
 
         if (-not $Global:isConnected) {fnConnect}
-        $totalMailboxes = $onlineTreeView.Nodes.Count
+        $totalMailboxes = $onlineListView.Items.Count
 
         if ($totalMailboxes -gt 0) {
             $progressBar.Value = 0
             $progressBar.Visible = $True
-            $onlineTreeView.Nodes | ForEach-Object {
+            $onlineListView.Items | ForEach-Object {
                 $reportItem = New-Object -TypeName PreFlightItem
-                $reportItem.primarySMTPAddress = $_.Name
+                $reportItem.primarySMTPAddress = $_.SubItems.Item(1).Text
                 $Error.Clear()
-                Write-Progress -Activity "Running pre-flight" -Status "Checking $($_.Name) - $([math]::Round($progressBar.Value))% complete" -PercentComplete ($progressBar.Value)
-                $statusLabel.Text = "Checking $($_.Name)"
+                Write-Progress -Activity "Running pre-flight" -Status "Checking $($_.SubItems.Item(0).Text) - $([math]::Round($progressBar.Value))% complete" -PercentComplete ($progressBar.Value)
+                $statusLabel.Text = "Checking $($_.SubItems.Item(0).Text)"
                 try {
-                    New-MoveRequest -Remote -RemoteHostName $Global:localExchange -RemoteCredential $Global:localCred -Identity $_.Name -TargetDeliveryDomain $Global:serviceDomain -BatchName "PreFlight" -ErrorAction Stop -WhatIf
+                    New-MoveRequest -Remote -RemoteHostName $Global:localExchange -RemoteCredential $Global:localCred -Identity $_.SubItems.Item(1).Text -TargetDeliveryDomain $Global:serviceDomain -BatchName "PreFlight" -ErrorAction Stop -WhatIf
                     $Message= $Error[0].Exception.Message
 
                     if($Message -eq $null) {
@@ -565,8 +658,8 @@ possibility of such damages.
                 $preFlightReport += $reportItem
                 $currentMailbox++
                 $progressBar.Value = (100*($currentMailbox))/$totalMailboxes
-                Write-Progress -Activity "Running pre-flight" -Status "Checked $($_.Name) - $([math]::Round($progressBar.Value))% complete" -PercentComplete ($progressBar.Value)
-                $statusLabel.Text = "Checked $($_.Name)"
+                Write-Progress -Activity "Running pre-flight" -Status "Checked $($_.SubItems.Item(0).Text) - $([math]::Round($progressBar.Value))% complete" -PercentComplete ($progressBar.Value)
+                $statusLabel.Text = "Checked $($_.SubItems.Item(0).Text)"
             }
             Write-Progress -Activity "Running pre-flight" -Completed
             fnWriteReport -ReportData $preFlightReport
@@ -627,7 +720,6 @@ possibility of such damages.
             $btnScheduleOk.Location = $drawingPoint
             $btnScheduleOk.Name = "btnScheduleOk"
             $btnScheduleOk.Size = $drawingSize
-            $btnScheduleOk.TabIndex = 1
             $btnScheduleOk.Text = "Ok"
             $btnScheduleOk.Add_Click({
                 if ($radioStartAutomatic.Checked) {$Global:migrationStrategy = 10}
@@ -638,7 +730,6 @@ possibility of such damages.
                 $Global:migrationEndpoint = $endpointBox.SelectedItem.ToString()
                 $Global:scheduleStartDateTime = [System.TimeZoneInfo]::ConvertTimeToUtc($startSchedulePicker.Value).GetDateTimeFormats('u')
                 $Global:scheduleCompleteDateTime = [System.TimeZoneInfo]::ConvertTimeToUtc($completeSchedulePicker.Value).GetDateTimeFormats('u')
-                $frmSchedule.Close()
             })
         #endregion
         
@@ -651,7 +742,6 @@ possibility of such damages.
             $btnScheduleCancel.Location = $drawingPoint
             $btnScheduleCancel.Name = "btnScheduleCancel"
             $btnScheduleCancel.Size = $drawingSize
-            $btnScheduleCancel.TabIndex = 2
             $btnScheduleCancel.Text = "Cancel"
         #endregion
 
@@ -677,7 +767,6 @@ possibility of such damages.
             $endpointBox.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
             $endpointBox.FormattingEnabled = $True
             $endpointBox.Name = "endpointBox"
-            $endpointBox.TabIndex = 2
         #endregion
 
         #region startSchedulePicker
@@ -689,7 +778,6 @@ possibility of such damages.
             $startSchedulePicker.Location = $drawingPoint
             $startSchedulePicker.Name = "startSchedulePicker"
             $startSchedulePicker.Size = $drawingSize
-            $startSchedulePicker.TabIndex = 0
             $startSchedulePicker.CustomFormat = $format
         #endregion
 
@@ -702,7 +790,6 @@ possibility of such damages.
             $completeSchedulePicker.Location = $drawingPoint
             $completeSchedulePicker.Name = "completeSchedulePicker"
             $completeSchedulePicker.Size = $drawingSize
-            $completeSchedulePicker.TabIndex = 0
             $completeSchedulePicker.CustomFormat = $format
         #endregion
 
@@ -714,7 +801,6 @@ possibility of such damages.
             $radioStartManual.Location = $drawingPoint
             $radioStartManual.Name = "radioStartManual"
             $radioStartManual.Size = $drawingSize
-            $radioStartManual.TabIndex = 4
             $radioStartManual.TabStop = $True
             $radioStartManual.Text = "Manually"
         #endregion
@@ -727,7 +813,6 @@ possibility of such damages.
             $radioStartAutomatic.Location = $drawingPoint
             $radioStartAutomatic.Name = "radioStartAutomatic"
             $radioStartAutomatic.Size = $drawingSize
-            $radioStartAutomatic.TabIndex = 4
             $radioStartAutomatic.TabStop = $True
             $radioStartAutomatic.Text = "Automatically"
         #endregion
@@ -740,7 +825,6 @@ possibility of such damages.
             $radioStartSchedule.Location = $drawingPoint
             $radioStartSchedule.Name = "radioStartSchedule"
             $radioStartSchedule.Size = $drawingSize
-            $radioStartSchedule.TabIndex = 4
             $radioStartSchedule.TabStop = $True
             $radioStartSchedule.Text = "Start the batch automatically after time:"
             $radioStartSchedule.Checked = $True
@@ -765,7 +849,6 @@ possibility of such damages.
             $radioCompleteManual.Location = $drawingPoint
             $radioCompleteManual.Name = "radioCompleteManual"
             $radioCompleteManual.Size = $drawingSize
-            $radioCompleteManual.TabIndex = 4
             $radioCompleteManual.TabStop = $True
             $radioCompleteManual.Text = "Manually"
         #endregion
@@ -778,7 +861,6 @@ possibility of such damages.
             $radioCompleteAutomatic.Location = $drawingPoint
             $radioCompleteAutomatic.Name = "radioCompleteAutomatic"
             $radioCompleteAutomatic.Size = $drawingSize
-            $radioCompleteAutomatic.TabIndex = 4
             $radioCompleteAutomatic.TabStop = $True
             $radioCompleteAutomatic.Text = "Automatically"
         #endregion
@@ -791,7 +873,6 @@ possibility of such damages.
             $radioCompleteSchedule.Location = $drawingPoint
             $radioCompleteSchedule.Name = "radioCompleteSchedule"
             $radioCompleteSchedule.Size = $drawingSize
-            $radioCompleteSchedule.TabIndex = 4
             $radioCompleteSchedule.TabStop = $True
             $radioCompleteSchedule.Text = "Complete the batch automatically after time:"
             $radioCompleteSchedule.Checked = $True
@@ -868,9 +949,9 @@ possibility of such damages.
 #region fnWriteScript
     Function fnWriteScript {
         [Int] $currentMailbox = 0
-        [Int] $totalMailboxes = $onlineTreeView.Nodes.Count
-        [string] $scriptFileName = "$(Get-Date -Format "yyyyMMdd-HHmmss").ps1"
+        [Int] $totalMailboxes = $onlineListView.Items.Count
         [string] $batchName = "$(Get-Date -Format "yyyyMMdd-HHmmss")"
+        [string] $scriptFileName = "$batchName.ps1"
         [string] $format = [System.Globalization.CultureInfo]::CurrentCulture.DateTimeFormat.FullDateTimePattern
         [string] $scriptFilePath = ""
         [System.Windows.Forms.DialogResult] $result = [System.Windows.Forms.DialogResult]::OK
@@ -882,7 +963,7 @@ possibility of such damages.
                 $saveDialog.InitialDirectory = [System.IO.Path]::GetFullPath("$($Script:MyInvocation.MyCommand.Path)\..\Scripts")
                 $saveDialog.Filter = "Windows PowerShell Script (*.ps1)|*.ps1|All files (*.*)|*.*"
                 $saveDialog.FileName = $scriptFileName
-                if ($result = [System.Windows.Forms.DialogResult]::OK) {
+                if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
                     if ($saveDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
                         $scriptFilePath = $saveDialog.FileName
                         '$cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Force
@@ -898,8 +979,8 @@ possibility of such damages.
                         '}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
                         '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
                         '$migrationList = "EmailAddress"' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                        $onlineTreeView.Nodes | ForEach-Object {
-                            "$('$migrationList += "`r`n')$($_.Name)""" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                        $onlineListView.Items | ForEach-Object {
+                            "$('$migrationList += "`r`n')$($_.SubItems.Item(1).Text)""" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
                         }
                         '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
                         '$csvData = [System.Text.Encoding]::ASCII.GetBytes($migrationList)' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
@@ -930,7 +1011,7 @@ possibility of such damages.
 #region fnMigrate
     Function fnMigrate {
         [Int] $currentMailbox = 0
-        [Int] $totalMailboxes = $onlineTreeView.Nodes.Count
+        [Int] $totalMailboxes = $onlineListView.Items.Count
         [string] $migrationList = "EmailAddress"
         [string] $batchName = "$(Get-Date -Format "yyyyMMdd-HHmmss")"
         [string] $format = [System.Globalization.CultureInfo]::CurrentCulture.DateTimeFormat.FullDateTimePattern
@@ -946,8 +1027,8 @@ possibility of such damages.
                     Write-Progress -Activity "Creating migration batch $batchName" -Status "Preparing list of users..." -PercentComplete ($progressBar.Value)
                     $statusLabel.Text = "Preparing list of users..."
 
-                    $onlineTreeView.Nodes | ForEach-Object {
-                        $migrationList += "`r`n$($_.Name)"
+                    $onlineListView.Items | ForEach-Object {
+                        $migrationList += "`r`n$($_.SubItems.Item(1).Text)"
                     }
 
                     $progressBar.Value = 10
@@ -984,6 +1065,32 @@ possibility of such damages.
     }
 #endregion
 
+#region fnImport
+    Function fnImport {
+        [System.Windows.Forms.OpenFileDialog] $openDialog = New-Object -TypeName System.Windows.Forms.OpenFileDialog
+        $openDialog.CheckFileExists = $True
+        $openDialog.InitialDirectory = [System.IO.Path]::GetFullPath("$($Script:MyInvocation.MyCommand.Path)\..\Scripts")
+        $openDialog.Filter = "Comma Separated Values file (*.csv)|*.csv|All files (*.*)|*.*"
+        $openDialog.DefaultExt = "csv"
+        $openDialog.Title = "Import csv file"
+        $openDialog.Multiselect = $False
+
+        if ($Global:isConnected){
+            fnLoad
+            if ($openDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+                Import-Csv -Path $openDialog.FileName | ForEach-Object {
+                    $itemFound = $onPremisesListView.FindItemWithText($_.PrimarySMTPAddress, $True, 0)
+
+                    If ($itemFound -ne $null) {
+                        $onPremisesListView.Items[$itemFound.Index].Remove()
+                        $onlineListView.Items.Add($itemFound)
+                    }
+                }
+            }
+        }
+    }
+#endregion
+
 #region Declaring form objects
     [string] $folderPath = "$(Split-Path -Parent -Path $MyInvocation.MyCommand.Definition)\Images"
     [string] $filePath = ""
@@ -991,8 +1098,12 @@ possibility of such damages.
     [System.Windows.Forms.StatusStrip] $mainStatusStrip = New-Object -TypeName System.Windows.Forms.StatusStrip
     [System.Windows.Forms.ToolStripProgressBar] $progressBar = New-Object -TypeName System.Windows.Forms.ToolStripProgressBar
     [System.Windows.Forms.ToolStripStatusLabel] $statusLabel = New-Object -TypeName System.Windows.Forms.ToolStripStatusLabel
-    [System.Windows.Forms.TreeView] $onPremisesTreeView = New-Object -TypeName System.Windows.Forms.TreeView
-    [System.Windows.Forms.TreeView] $onlineTreeView = New-Object -TypeName System.Windows.Forms.TreeView
+    [System.Windows.Forms.ColumnHeader] $columnOnPremises1 = New-Object -TypeName System.Windows.Forms.ColumnHeader
+    [System.Windows.Forms.ColumnHeader] $columnOnPremises2 = New-Object -TypeName System.Windows.Forms.ColumnHeader
+    [System.Windows.Forms.ColumnHeader] $columnOnline1 = New-Object -TypeName System.Windows.Forms.ColumnHeader
+    [System.Windows.Forms.ColumnHeader] $columnOnline2 = New-Object -TypeName System.Windows.Forms.ColumnHeader
+    [System.Windows.Forms.ListView] $onPremisesListView = New-Object -TypeName System.Windows.Forms.ListView
+    [System.Windows.Forms.ListView] $onlineListView = New-Object -TypeName System.Windows.Forms.ListView
     [System.Windows.Forms.Button] $btnAdd = New-Object -TypeName System.Windows.Forms.Button
     [System.Windows.Forms.Button] $btnAddAll = New-Object -TypeName System.Windows.Forms.Button
     [System.Windows.Forms.Button] $btnRemove = New-Object -TypeName System.Windows.Forms.Button
@@ -1002,6 +1113,7 @@ possibility of such damages.
     [System.Windows.Forms.ToolStripMenuItem] $menuItemFileConfigure = New-Object -TypeName System.Windows.Forms.ToolStripMenuItem
     [System.Windows.Forms.ToolStripMenuItem] $menuItemFileConnect = New-Object -TypeName System.Windows.Forms.ToolStripMenuItem
     [System.Windows.Forms.ToolStripMenuItem] $menuItemFileReload = New-Object -TypeName System.Windows.Forms.ToolStripMenuItem
+    [System.Windows.Forms.ToolStripMenuItem] $menuItemFileImport = New-Object -TypeName System.Windows.Forms.ToolStripMenuItem
     [System.Windows.Forms.ToolStripMenuItem] $menuItemFilePreFlight = New-Object -TypeName System.Windows.Forms.ToolStripMenuItem
     [System.Windows.Forms.ToolStripMenuItem] $menuItemFileExport = New-Object -TypeName System.Windows.Forms.ToolStripMenuItem
     [System.Windows.Forms.ToolStripMenuItem] $menuItemFileMigrate = New-Object -TypeName System.Windows.Forms.ToolStripMenuItem
@@ -1015,12 +1127,19 @@ possibility of such damages.
     [System.Windows.Forms.ToolStripButton] $toolbarBtnConfiguration = New-Object -TypeName System.Windows.Forms.ToolStripButton
     [System.Windows.Forms.ToolStripButton] $toolbarBtnConnect = New-Object -TypeName System.Windows.Forms.ToolStripButton
     [System.Windows.Forms.ToolStripButton] $toolbarBtnReload = New-Object -TypeName System.Windows.Forms.ToolStripButton
+    [System.Windows.Forms.ToolStripButton] $toolbarBtnImport = New-Object -TypeName System.Windows.Forms.ToolStripButton
     [System.Windows.Forms.ToolStripButton] $toolbarBtnPreFlight = New-Object -TypeName System.Windows.Forms.ToolStripButton
     [System.Windows.Forms.ToolStripButton] $toolbarBtnExport = New-Object -TypeName System.Windows.Forms.ToolStripButton
     [System.Windows.Forms.ToolStripButton] $toolbarBtnMigrate = New-Object -TypeName System.Windows.Forms.ToolStripButton
     [System.Windows.Forms.ToolStripSeparator] $toolbarSeparator1 = New-Object -TypeName System.Windows.Forms.ToolStripSeparator
     [System.Windows.Forms.Label] $lblAvailable = New-Object -TypeName System.Windows.Forms.Label
     [System.Windows.Forms.Label] $lblSelected = New-Object -TypeName System.Windows.Forms.Label
+    [System.Windows.Forms.Label] $lblSearchOnPremises = New-Object -TypeName System.Windows.Forms.Label
+    [System.Windows.Forms.Label] $lblSearchOnline = New-Object -TypeName System.Windows.Forms.Label
+    [System.Windows.Forms.TextBox] $txtSearchOnPremises = New-Object -TypeName System.Windows.Forms.TextBox
+    [System.Windows.Forms.TextBox] $txtSearchOnline = New-Object -TypeName System.Windows.Forms.TextBox
+    [ListViewColumnSorter] $localSorter = New-Object -TypeName ListViewColumnSorter
+    [ListViewColumnSorter] $onlineSorter = New-Object -TypeName ListViewColumnSorter
 #endregion
 
 #region setting form objects
@@ -1031,9 +1150,10 @@ possibility of such damages.
         $drawingSize.Width = 100
         $lblAvailable.AutoSize = $True
         $lblAvailable.Location = $drawingPoint
-        $lblAvailable.Name = "Label1"
+        $lblAvailable.Name = "lblAvailable"
         $lblAvailable.Size = $drawingSize
         $lblAvailable.Text = "Available mailboxes"
+        $lblAvailable.TabStop = $False
     #endregion
 
     #region lblSelected
@@ -1046,6 +1166,65 @@ possibility of such damages.
         $lblSelected.Name = "Label1"
         $lblSelected.Size = $drawingSize
         $lblSelected.Text = "Selected mailboxes"
+        $lblSelected.TabStop = $False
+    #endregion
+
+    #region lblSearchOnPremises
+        $drawingPoint.X = 12
+        $drawingPoint.Y = 102
+        $drawingSize.Height = 13
+        $drawingSize.Width = 41
+        $lblSearchOnPremises.AutoSize = $True
+        $lblSearchOnPremises.Location = $drawingPoint
+        $lblSearchOnPremises.Name = "lblSearchOnPremises"
+        $lblSearchOnPremises.Size = $drawingSize
+        $lblSearchOnPremises.Text = "Search:"
+        $lblSearchOnPremises.TabStop = $False
+    #endregion
+
+    #region lblSearchOnline
+        $drawingPoint.X = 623
+        $drawingPoint.Y = 102
+        $drawingSize.Height = 13
+        $drawingSize.Width = 41
+        $lblSearchOnline.AutoSize = $True
+        $lblSearchOnline.Location = $drawingPoint
+        $lblSearchOnline.Name = "lblSearchOnline"
+        $lblSearchOnline.Size = $drawingSize
+        $lblSearchOnline.Text = "Search:"
+        $lblSearchOnline.TabStop = $False
+    #endregion
+
+    #region txtSearchOnPremises
+        $drawingPoint.X = 58
+        $drawingPoint.Y = 99
+        $drawingSize.Height = 20
+        $drawingSize.Width = 489
+        $txtSearchOnPremises.Location = $drawingPoint
+        $txtSearchOnPremises.Size = $drawingSize
+        $txtSearchOnPremises.Add_TextChanged({
+            $itemFound = $onPremisesListView.FindItemWithText($txtSearchOnPremises.Text)
+
+            If ($itemFound -ne $null) {
+                $onPremisesListView.TopItem = $itemFound
+            }
+        })
+    #endregion
+    
+    #region txtSearchOnline
+        $drawingPoint.X = 669
+        $drawingPoint.Y = 99
+        $drawingSize.Height = 20
+        $drawingSize.Width = 489
+        $txtSearchOnline.Location = $drawingPoint
+        $txtSearchOnline.Size = $drawingSize
+        $txtSearchOnline.Add_TextChanged({
+            $itemFound = $onlineListView.FindItemWithText($txtSearchOnline.Text)
+
+            If ($itemFound -ne $null) {
+                $onlineListView.TopItem = $itemFound
+            }
+        })
     #endregion
 
     #region progressBar
@@ -1078,40 +1257,108 @@ possibility of such damages.
         $mainStatusStrip.TabStop = $False
         $mainStatusStrip.SizingGrip = $False
         $mainStatusStrip.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
-        #$mainStatusStrip.LayoutStyle = [System.Windows.Forms.ToolStripLayoutStyle]::Flow
         $mainStatusStrip.Items.AddRange(@($progressBar, $statusLabel))
+        $mainStatusStrip.TabStop = $False
     #endregion
 
-    #region onPremisesTreeView
+    #region columnOnPremises1
+        $columnOnPremises1.Tag = "columnOnPremises1"
+        $columnOnPremises1.Name = "columnOnPremises1"
+        $columnOnPremises1.Text = "Display name"
+        $columnOnPremises1.Width = 265
+    #endregion
+
+    #region columnOnPremises2
+        $columnOnPremises2.Tag = "columnOnPremises1"
+        $columnOnPremises2.Name = "columnOnPremises1"
+        $columnOnPremises2.Text = "E-mail address"
+        $columnOnPremises2.Width = 249
+    #endregion
+
+    #region columnOnline1
+        $columnOnline1.Tag = "columnOnline1"
+        $columnOnline1.Name = "columnOnline1"
+        $columnOnline1.Text = "Display name"
+        $columnOnline1.Width = 265
+    #endregion
+
+    #region columnOnline2
+        $columnOnline2.Tag = "columnOnline2"
+        $columnOnline2.Name = "columnOnline2"
+        $columnOnline2.Text = "E-mail address"
+        $columnOnline2.Width = 249
+    #endregion
+
+    #region onPremisesListView
         $drawingPoint.X = 12
-        $drawingPoint.Y = 99
-        $drawingSize.Height = 412
+        $drawingPoint.Y = 125
+        $drawingSize.Height = 386
         $drawingSize.Width = 535
-        $onPremisesTreeView.Location = $drawingPoint
-        $onPremisesTreeView.Name = "onPremisesTreeView"
-        $onPremisesTreeView.Size = $drawingSize
-        $onPremisesTreeView.CheckBoxes = $True
-        $onPremisesTreeView.HideSelection = $False
-        $onPremisesTreeView.HotTracking = $True
-        $onPremisesTreeView.ShowLines = $False
-        $onPremisesTreeView.ShowPlusMinus = $False
-        $onPremisesTreeView.TabIndex = 1
+
+        $onPremisesListView.CheckBoxes = $True
+        $onPremisesListView.Columns.AddRange(@($columnOnPremises1, $columnOnPremises2))
+        $onPremisesListView.HideSelection = $False
+        $onPremisesListView.Location = $drawingPoint
+        $onPremisesListView.Size = $drawingSize
+        $onPremisesListView.Name = "onPremisesListView"
+        $onPremisesListView.ListViewItemSorter = $localSorter
+        $onPremisesListView.Sorting = [System.Windows.Forms.SortOrder]::Ascending
+        $onPremisesListView.View = [System.Windows.Forms.View]::Details
+        $onPremisesListView.FullRowSelect = $True
+        $onPremisesListView.Add_ColumnClick({
+            Param($sender, $e)
+            If ($onPremisesListView.AccessibleName -eq $e.Column.ToString()) {
+                If ($onPremisesListView.Sorting -eq [System.Windows.Forms.SortOrder]::Ascending) {
+                    $onPremisesListView.Sorting = [System.Windows.Forms.SortOrder]::Descending
+                }
+                Else {
+                    $onPremisesListView.Sorting = [System.Windows.Forms.SortOrder]::Ascending
+                }
+            }
+            Else {
+                $onPremisesListView.Sorting = [System.Windows.Forms.SortOrder]::Ascending
+                $onPremisesListView.AccessibleName = $e.Column.ToString()
+            }
+            $onPremisesListView.ListViewItemSorter.Order = $onPremisesListView.Sorting
+            $onPremisesListView.ListViewItemSorter.SortColumn = $e.Column
+            $onPremisesListView.Sort()
+        })
     #endregion
 
-    #region onlineTreeView
+    #region onlineListView
         $drawingPoint.X = 626
-        $drawingPoint.Y = 99
-        $drawingSize.Height = 412
+        $drawingPoint.Y = 125
+        $drawingSize.Height = 386
         $drawingSize.Width = 535
-        $onlineTreeView.Location = $drawingPoint
-        $onlineTreeView.Name = "onlineTreeView"
-        $onlineTreeView.Size = $drawingSize
-        $onlineTreeView.CheckBoxes = $True
-        $onlineTreeView.HideSelection = $False
-        $onlineTreeView.HotTracking = $True
-        $onlineTreeView.ShowLines = $False
-        $onlineTreeView.ShowPlusMinus = $False
-        $onlineTreeView.TabIndex = 6
+
+        $onlineListView.CheckBoxes = $True
+        $onlineListView.Columns.AddRange(@($columnOnline1, $columnOnline2))
+        $onlineListView.HideSelection = $False
+        $onlineListView.Location = $drawingPoint
+        $onlineListView.Size = $drawingSize
+        $onlineListView.Name = "onPremisesListView"
+        $onlineListView.ListViewItemSorter = $onlineSorter
+        $onlineListView.Sorting = [System.Windows.Forms.SortOrder]::Ascending
+        $onlineListView.View = [System.Windows.Forms.View]::Details
+        $onlineListView.FullRowSelect = $True
+        $onlineListView.Add_ColumnClick({
+            Param($sender, $e)
+            If ($onlineListView.AccessibleName -eq $e.Column.ToString()) {
+                If ($onlineListView.Sorting -eq [System.Windows.Forms.SortOrder]::Ascending) {
+                    $onlineListView.Sorting = [System.Windows.Forms.SortOrder]::Descending
+                }
+                Else {
+                    $onlineListView.Sorting = [System.Windows.Forms.SortOrder]::Ascending
+                }
+            }
+            Else {
+                $onlineListView.Sorting = [System.Windows.Forms.SortOrder]::Ascending
+                $onlineListView.AccessibleName = $e.Column.ToString()
+            }
+            $onlineListView.ListViewItemSorter.Order = $onlineListView.Sorting
+            $onlineListView.ListViewItemSorter.SortColumn = $e.Column
+            $onlineListView.Sort()
+        })
     #endregion
 
     #region btnAdd
@@ -1122,16 +1369,15 @@ possibility of such damages.
         $btnAdd.Location = $drawingPoint
         $btnAdd.Name = "btnAdd"
         $btnAdd.Size = $drawingSize
-        $btnAdd.TabIndex = 2
         $btnAdd.Text = ">"
         $btnAdd.UseVisualStyleBackColor = $True
         $btnAdd.Add_Click({
-            if ($onPremisesTreeView.Nodes.Count -gt 0) {
-                ($onPremisesTreeView.Nodes.Count - 1)..0 | ForEach-Object {
-                    if ($onPremisesTreeView.Nodes[$_].Checked) {
-                        $node = $onPremisesTreeView.Nodes[$_]
-                        $onPremisesTreeView.Nodes[$_].Remove()
-                        $onlineTreeView.Nodes.Add($node)
+            if ($onPremisesListView.Items.Count-gt 0) {
+                ($onPremisesListView.Items.Count - 1)..0 | ForEach-Object {
+                    if ($onPremisesListView.Items[$_].Checked) {
+                        $node = $onPremisesListView.Items[$_]
+                        $onPremisesListView.Items[$_].Remove()
+                        $onlineListView.Items.Add($node)
                     }
                 }
             }
@@ -1146,15 +1392,14 @@ possibility of such damages.
         $btnAddAll.Location = $drawingPoint
         $btnAddAll.Name = "btnAddAll"
         $btnAddAll.Size = $drawingSize
-        $btnAddAll.TabIndex = 3
         $btnAddAll.Text = ">>"
         $btnAddAll.UseVisualStyleBackColor = $True
         $btnAddAll.Add_Click({
-            if ($onPremisesTreeView.Nodes.Count -gt 0) {
-                ($onPremisesTreeView.Nodes.Count - 1)..0 | ForEach-Object {
-                    $node = $onPremisesTreeView.Nodes[$_]
-                    $onPremisesTreeView.Nodes[$_].Remove()
-                    $onlineTreeView.Nodes.Add($node)
+            if ($onPremisesListView.Items.Count -gt 0) {
+                ($onPremisesListView.Items.Count - 1)..0 | ForEach-Object {
+                    $node = $onPremisesListView.Items[$_]
+                    $onPremisesListView.Items[$_].Remove()
+                    $onlineListView.Items.Add($node)
                 }
             }
         })
@@ -1168,16 +1413,15 @@ possibility of such damages.
         $btnRemove.Location = $drawingPoint
         $btnRemove.Name = "btnRemove"
         $btnRemove.Size = $drawingSize
-        $btnRemove.TabIndex = 4
         $btnRemove.Text = "<"
         $btnRemove.UseVisualStyleBackColor = $True
         $btnRemove.Add_Click({
-            if ($onlineTreeView.Nodes.Count -gt 0) {
-                ($onlineTreeView.Nodes.Count - 1)..0 | ForEach-Object {
-                    if ($onlineTreeView.Nodes[$_].Checked) {
-                        $node = $onlineTreeView.Nodes[$_]
-                        $onlineTreeView.Nodes[$_].Remove()
-                        $onPremisesTreeView.Nodes.Add($node)
+            if ($onlineListView.Items.Count -gt 0) {
+                ($onlineListView.Items.Count - 1)..0 | ForEach-Object {
+                    if ($onlineListView.Items[$_].Checked) {
+                        $node = $onlineListView.Items[$_]
+                        $onlineListView.Items[$_].Remove()
+                        $onPremisesListView.Items.Add($node)
                     }
                 }
             }
@@ -1192,15 +1436,14 @@ possibility of such damages.
         $btnRemoveAll.Location = $drawingPoint
         $btnRemoveAll.Name = "btnRemoveAll"
         $btnRemoveAll.Size = $drawingSize
-        $btnRemoveAll.TabIndex = 5
         $btnRemoveAll.Text = "<<"
         $btnRemoveAll.UseVisualStyleBackColor = $True
         $btnRemoveAll.Add_Click({
-            if ($onlineTreeView.Nodes.Count -gt 0) {
-                ($onlineTreeView.Nodes.Count - 1)..0 | ForEach-Object {
-                    $node = $onlineTreeView.Nodes[$_]
-                    $onlineTreeView.Nodes[$_].Remove()
-                    $onPremisesTreeView.Nodes.Add($node)
+            if ($onlineListView.Items.Count -gt 0) {
+                ($onlineListView.Items.Count - 1)..0 | ForEach-Object {
+                    $node = $onlineListView.Items[$_]
+                    $onlineListView.Items[$_].Remove()
+                    $onPremisesListView.Items.Add($node)
                 }
             }
         })
@@ -1231,6 +1474,15 @@ possibility of such damages.
         $menuItemFileReload.Size = $drawingSize
         $menuItemFileReload.Text = "&Reload"
         $menuItemFileReload.Add_Click({fnLoad})
+    #endregion
+
+    #region menuItemFileImport
+        $drawingSize.Height = 22
+        $drawingSize.Width = 152
+        $menuItemFileImport.Name = "menuItemFileImport"
+        $menuItemFileImport.Size = $drawingSize
+        $menuItemFileImport.Text = "&Import..."
+        $menuItemFileImport.Add_Click({fnImport})
     #endregion
 
     #region menuItemFilePreFlight
@@ -1286,7 +1538,7 @@ possibility of such damages.
     #region menuItemFile
         $drawingSize.Height = 20
         $drawingSize.Width = 37
-        $menuItemFile.DropDownItems.AddRange(@($menuItemFileConfigure, $menuItemFileConnect, $menuItemFileReload, $menuItemFileSpace1, $menuItemFilePreFlight, $menuItemFileExport, $menuItemFileMigrate, $menuItemFileSpace2, $menuItemFileExit))
+        $menuItemFile.DropDownItems.AddRange(@($menuItemFileConfigure, $menuItemFileConnect, $menuItemFileReload, $menuItemFileImport, $menuItemFileSpace1, $menuItemFilePreFlight, $menuItemFileExport, $menuItemFileMigrate, $menuItemFileSpace2, $menuItemFileExit))
         $menuItemFile.Name = "menuItemFile"
         $menuItemFile.Size = $drawingSize
         $menuItemFile.Text = "&File"
@@ -1328,8 +1580,8 @@ possibility of such damages.
         $mainMenuStrip.Location = $drawingPoint
         $mainMenuStrip.Name = "mainMenuStrip"
         $mainMenuStrip.Size = $drawingSize
-        $mainMenuStrip.TabIndex = 7
         $mainMenuStrip.Text = "mainMenuStrip"
+        $mainMenuStrip.TabStop = $False
     #endregion
 
     #region toolbarBtnConfiguration
@@ -1356,6 +1608,20 @@ possibility of such damages.
         $toolbarBtnConnect.Size = $drawingSize
         $toolbarBtnConnect.Text = "Connect"
         $toolbarBtnConnect.Add_Click({fnConnect})
+    #endregion
+
+    #region toolbarBtnImport
+        $filePath = "$folderPath\Import48.png"
+        $drawingSize.Height = 52
+        $drawingSize.Width = 52
+        $toolbarBtnImport.DisplayStyle = [System.Windows.Forms.ToolStripItemDisplayStyle]::Image
+        $toolbarBtnImport.Image = [System.Drawing.Image]::Fromfile($filePath)
+        $toolbarBtnImport.ImageTransparentColor = [System.Drawing.Color]::Magenta
+        $toolbarBtnImport.Name = "toolbarBtnImport"
+        $toolbarBtnImport.Size = $drawingSize
+        $toolbarBtnImport.Text = "Import"
+        $toolbarBtnImport.Add_Click({fnImport})
+
     #endregion
 
     #region toolbarBtnReload
@@ -1424,7 +1690,7 @@ possibility of such damages.
         $drawingSize.Height = 48
         $drawingSize.Width = 48
         $toolBar.ImageScalingSize = $drawingSize
-        $toolBar.Items.AddRange(@($toolbarBtnConfiguration, $toolbarBtnConnect, $toolbarBtnReload, $toolbarSeparator1, $toolbarBtnPreFlight, $toolbarBtnExport, $toolbarBtnMigrate))
+        $toolBar.Items.AddRange(@($toolbarBtnConfiguration, $toolbarBtnConnect, $toolbarBtnReload, $toolbarBtnImport, $toolbarSeparator1, $toolbarBtnPreFlight, $toolbarBtnExport, $toolbarBtnMigrate))
         $toolBar.Location = $drawingPoint
         $toolBar.Name = "toolBar"
         $drawingSize.Height = 55
@@ -1448,23 +1714,26 @@ possibility of such damages.
         $frmMain.Icon = [System.Drawing.Icon]::FromHandle($toolbarBtnConnect.Image.GetHicon())
         $frmMain.Add_Closed({fnDisconnect})
     #endregion
-
 #endregion
 
 #region Loading form
     $frmMain.ResumeLayout($False)
     $frmMain.PerformLayout()
     $frmMain.Controls.Add($toolBar)
-    $frmMain.Controls.Add($btnRemoveAll)
-    $frmMain.Controls.Add($btnRemove)
-    $frmMain.Controls.Add($btnAddAll)
+    $frmMain.Controls.Add($txtSearchOnPremises)
+    $frmMain.Controls.Add($txtSearchOnline)
+    $frmMain.Controls.Add($onPremisesListView)
     $frmMain.Controls.Add($btnAdd)
-    $frmMain.Controls.Add($onlineTreeView)
-    $frmMain.Controls.Add($onPremisesTreeView)
+    $frmMain.Controls.Add($btnAddAll)
+    $frmMain.Controls.Add($btnRemove)
+    $frmMain.Controls.Add($btnRemoveAll)
+    $frmMain.Controls.Add($onlineListView)
     $frmMain.Controls.Add($mainStatusStrip)
     $frmMain.Controls.Add($mainMenuStrip)
     $frmMain.Controls.Add($lblAvailable)
     $frmMain.Controls.Add($lblSelected)
+    $frmMain.Controls.Add($lblSearchOnPremises)
+    $frmMain.Controls.Add($lblSearchOnline)
     $frmMain.WindowState = $windowState
     [void] $frmMain.ShowDialog()
 #endregion
