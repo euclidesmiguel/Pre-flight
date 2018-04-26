@@ -1,4 +1,4 @@
-[string] $version = "1.7"
+[string] $version = "1.7.1"
 
 <#
 
@@ -1076,8 +1076,8 @@ possibility of such damages.
         $openDialog.Multiselect = $False
 
         if ($Global:isConnected){
-            fnLoad
             if ($openDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+                fnRemoveAll
                 Import-Csv -Path $openDialog.FileName | ForEach-Object {
                     $itemFound = $onPremisesListView.FindItemWithText($_.PrimarySMTPAddress, $True, 0)
 
@@ -1085,7 +1085,22 @@ possibility of such damages.
                         $onPremisesListView.Items[$itemFound.Index].Remove()
                         $onlineListView.Items.Add($itemFound)
                     }
+                    else {
+                        Write-Host "Object not found: $($_.PrimarySMTPAddress)" -ForegroundColor Red
+                    }
                 }
+            }
+        }
+    }
+#endregion
+
+#region fnRemoveAll
+    Function fnRemoveAll {
+        if ($onlineListView.Items.Count -gt 0) {
+            ($onlineListView.Items.Count - 1)..0 | ForEach-Object {
+                $itemFound = $onlineListView.Items[$_]
+                $onlineListView.Items[$_].Remove()
+                $onPremisesListView.Items.Add($itemFound)
             }
         }
     }
@@ -1438,15 +1453,7 @@ possibility of such damages.
         $btnRemoveAll.Size = $drawingSize
         $btnRemoveAll.Text = "<<"
         $btnRemoveAll.UseVisualStyleBackColor = $True
-        $btnRemoveAll.Add_Click({
-            if ($onlineListView.Items.Count -gt 0) {
-                ($onlineListView.Items.Count - 1)..0 | ForEach-Object {
-                    $node = $onlineListView.Items[$_]
-                    $onlineListView.Items[$_].Remove()
-                    $onPremisesListView.Items.Add($node)
-                }
-            }
-        })
+        $btnRemoveAll.Add_Click({fnRemoveAll})
     #endregion
 
     #region menuItemFileConfigure
