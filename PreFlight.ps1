@@ -1,4 +1,5 @@
-[string] $version = "1.7.1"
+﻿Param ([switch] $AutoLoad)
+[string] $version = "1.8.3"
 
 <#
 
@@ -150,6 +151,7 @@ possibility of such damages.
 #region fnConnect
     Function fnConnect {
         [Boolean] $continue = $True
+        
 
         $progressBar.Value = 10
         $progressBar.Visible = $True
@@ -181,7 +183,7 @@ possibility of such damages.
                 }
             }
             if ($Global:isConnected) {
-                fnLoad
+                fnLoad -LoadUsers:$AutoLoad
             }
         }
 
@@ -193,6 +195,7 @@ possibility of such damages.
 
 #region fnLoad
     Function fnLoad {
+        Param ([switch] $LoadUsers)
         $onPremisesListView.Items.Clear()
         $onlineListView.Items.Clear()
         $Global:endPointList.Clear()
@@ -203,11 +206,14 @@ possibility of such damages.
         else {
             $progressBar.Value = 25
             $progressBar.Visible = $True
-            $statusLabel.Text = "Loading list of users available for migration..."
-            Get-MailUser -ResultSize Unlimited | Sort-Object Name | Where-Object {$_.ExchangeGuid -ne "00000000-0000-0000-0000-000000000000"} | ForEach-Object {
-                $listViewItem = New-Object -TypeName System.Windows.Forms.ListViewItem([System.String[]](@($_.DisplayName, $_.PrimarySmtpAddress)), -1)
-                $ListViewItem.Checked = $False
-                $onPremisesListView.Items.AddRange([System.Windows.Forms.ListViewItem[]](@($listViewItem)))
+            If ($LoadUsers) {
+                $onPremisesListView.BackgroundImage = $null
+                $statusLabel.Text = "Loading list of users available for migration..."
+                Get-MailUser -ResultSize Unlimited | Sort-Object Name | Where-Object {$_.ExchangeGuid -ne "00000000-0000-0000-0000-000000000000"} | ForEach-Object {
+                    $listViewItem = New-Object -TypeName System.Windows.Forms.ListViewItem([System.String[]](@($_.DisplayName, $_.PrimarySmtpAddress)), -1)
+                    $ListViewItem.Checked = $False
+                    $onPremisesListView.Items.AddRange([System.Windows.Forms.ListViewItem[]](@($listViewItem)))
+                }
             }
             $progressBar.Value = 75
             $statusLabel.Text = "Discovering service domain..."
@@ -1079,14 +1085,32 @@ possibility of such damages.
             if ($openDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
                 fnRemoveAll
                 Import-Csv -Path $openDialog.FileName | ForEach-Object {
-                    $itemFound = $onPremisesListView.FindItemWithText($_.PrimarySMTPAddress, $True, 0)
+                    If ($onPremisesListView.Items.Count -gt 0) {
+                        $itemFound = $onPremisesListView.FindItemWithText($_.PrimarySMTPAddress, $True, 0)
+                    }
+                    Else {
+                        $itemFound = $null
+                    }
 
-                    If ($itemFound -ne $null) {
+                    if ($null -ne $itemFound) {
                         $onPremisesListView.Items[$itemFound.Index].Remove()
                         $onlineListView.Items.Add($itemFound)
                     }
                     else {
-                        Write-Host "Object not found: $($_.PrimarySMTPAddress)" -ForegroundColor Red
+                        $User = Get-MailUser -Identity $_.PrimarySMTPAddress -ErrorAction SilentlyContinue | Where-Object {$_.ExchangeGuid -ne "00000000-0000-0000-0000-000000000000"}
+                        If ($null -ne $User) {
+                            Write-Host "Object loaded: $($_.PrimarySMTPAddress)" -ForegroundColor Yellow
+                            $listViewItem = New-Object -TypeName System.Windows.Forms.ListViewItem([System.String[]](@($User.DisplayName, $User.PrimarySmtpAddress)), -1)
+                            $listViewItem.Checked = $False
+                            $onlineListView.Items.Add($listViewItem)
+                        }
+                        else {
+                            Write-Host "Object not found in Exchange Online: $($_.PrimarySMTPAddress)" -ForegroundColor Red
+                            $listViewItem = New-Object -TypeName System.Windows.Forms.ListViewItem([System.String[]](@($_.PrimarySmtpAddress, $_.PrimarySmtpAddress)), -1)
+                            $listViewItem.Checked = $False
+                            $listViewItem.Font = New-Object -TypeName System.Drawing.Font ($listViewItem.Font, [System.Drawing.FontStyle]::Italic)
+                            $onlineListView.Items.Add($listViewItem)
+                        }
                     }
                 }
             }
@@ -1310,6 +1334,8 @@ possibility of such damages.
         $drawingSize.Height = 386
         $drawingSize.Width = 535
 
+        $filePath = "$folderPath\Background.png"
+        $onPremisesListView.BackgroundImage = [System.Drawing.Image]::FromFile($filePath)
         $onPremisesListView.CheckBoxes = $True
         $onPremisesListView.Columns.AddRange(@($columnOnPremises1, $columnOnPremises2))
         $onPremisesListView.HideSelection = $False
@@ -1480,7 +1506,7 @@ possibility of such damages.
         $menuItemFileReload.Name = "menuItemFileReload"
         $menuItemFileReload.Size = $drawingSize
         $menuItemFileReload.Text = "&Reload"
-        $menuItemFileReload.Add_Click({fnLoad})
+        $menuItemFileReload.Add_Click({fnLoad -LoadUsers})
     #endregion
 
     #region menuItemFileImport
@@ -1641,7 +1667,7 @@ possibility of such damages.
         $toolbarBtnReload.Name = "toolbarBtnReload"
         $toolbarBtnReload.Size = $drawingSize
         $toolbarBtnReload.Text = "Reload"
-        $toolbarBtnReload.Add_Click({fnLoad})
+        $toolbarBtnReload.Add_Click({fnLoad -LoadUsers})
 
     #endregion
 
