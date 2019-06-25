@@ -1,6 +1,6 @@
 param ([PSCredential] $Credential = (New-Object System.Management.Automation.PSCredential ("dummy", (ConvertTo-SecureString "dummy" -AsPlainText -Force))))
 
-[string] $version = "0.6"
+[string] $version = "0.8"
 
 <#
 
@@ -51,111 +51,111 @@ possibility of such damages.
 
 #region custom types
     Add-Type -Language VisualBasic -ReferencedAssemblies ("System.Collections", "System.Windows.Forms") -TypeDefinition @"
-        Imports System.Collections
-        Imports System.Windows.Forms
+    Imports System.Collections
+    Imports System.Windows.Forms
 
-        Public Class MigrationDetail
-            Public ArchiveSizeMB As Integer
-            Public CompletionTimestamp As String
-            Public ErrorSummary As String
-            Public ItemsTransferred As Integer
-            Public MailboxEmailAddress As String
-            Public MailboxSizeMB As Integer
-            Public MBTransferred As Integer
-            Public OverallDuration As System.TimeSpan
-            Public RecipientTypeDetails As String
-            Public StartTimestamp As String
-            Public Status As String
-            Public StatusDetail As String
+    Public Class MigrationDetail
+        Public ArchiveSizeMB As Integer
+        Public CompletionTimestamp As String
+        Public ErrorSummary As String
+        Public ItemsTransferred As Integer
+        Public MailboxEmailAddress As String
+        Public MailboxSizeMB As Integer
+        Public MBTransferred As Integer
+        Public OverallDuration As System.TimeSpan
+        Public RecipientTypeDetails As String
+        Public StartTimestamp As String
+        Public Status As String
+        Public StatusDetail As String
 
-            Public ReadOnly Property TotalMailboxSizeMB() As Integer
-                Get
-                    Return Me.ArchiveSizeMB + Me.MailboxSizeMB
-                End Get
-            End Property
+        Public ReadOnly Property TotalMailboxSizeMB() As Integer
+            Get
+                Return Me.ArchiveSizeMB + Me.MailboxSizeMB
+            End Get
+        End Property
 
-            Public Sub New()
-                Me.ArchiveSizeMB = 0
-                Me.CompletionTimestamp = ""
-                Me.ErrorSummary = ""
-                Me.ItemsTransferred = 0
-                Me.MailboxEmailAddress = ""
-                Me.MailboxSizeMB = 0
-                Me.MBTransferred = 0
-                Me.OverallDuration = System.TimeSpan.Zero
-                Me.RecipientTypeDetails = ""
-                Me.StartTimestamp = ""
-                Me.Status = ""
-                Me.StatusDetail = ""
-            End Sub
-        End Class
+        Public Sub New()
+            Me.ArchiveSizeMB = 0
+            Me.CompletionTimestamp = ""
+            Me.ErrorSummary = ""
+            Me.ItemsTransferred = 0
+            Me.MailboxEmailAddress = ""
+            Me.MailboxSizeMB = 0
+            Me.MBTransferred = 0
+            Me.OverallDuration = System.TimeSpan.Zero
+            Me.RecipientTypeDetails = ""
+            Me.StartTimestamp = ""
+            Me.Status = ""
+            Me.StatusDetail = ""
+        End Sub
+    End Class
 
-        Public Class ListViewColumnSorter
-            Implements System.Collections.IComparer
+    Public Class ListViewColumnSorter
+        Implements System.Collections.IComparer
 
-            Private ColumnToSort As Integer
-            Private OrderOfSort As SortOrder
-            Private ObjectCompare As CaseInsensitiveComparer
+        Private ColumnToSort As Integer
+        Private OrderOfSort As SortOrder
+        Private ObjectCompare As CaseInsensitiveComparer
 
-            Public Sub New()
-                ' Initialize the column to '0'.
-                ColumnToSort = 0
+        Public Sub New()
+            ' Initialize the column to '0'.
+            ColumnToSort = 0
 
-                ' Initialize the sort order to 'none'.
-                OrderOfSort = SortOrder.None
+            ' Initialize the sort order to 'none'.
+            OrderOfSort = SortOrder.None
 
-                ' Initialize the CaseInsensitiveComparer object.
-                ObjectCompare = New CaseInsensitiveComparer()
-            End Sub
+            ' Initialize the CaseInsensitiveComparer object.
+            ObjectCompare = New CaseInsensitiveComparer()
+        End Sub
 
-            Public Function Compare(ByVal x As Object, ByVal y As Object) As Integer Implements IComparer.Compare
-                Dim compareResult As Integer
-                Dim listviewX As ListViewItem
-                Dim listviewY As ListViewItem
+        Public Function Compare(ByVal x As Object, ByVal y As Object) As Integer Implements IComparer.Compare
+            Dim compareResult As Integer
+            Dim listviewX As ListViewItem
+            Dim listviewY As ListViewItem
 
-                ' Cast the objects to be compared to ListViewItem objects.
-                listviewX = CType(x, ListViewItem)
-                listviewY = CType(y, ListViewItem)
+            ' Cast the objects to be compared to ListViewItem objects.
+            listviewX = CType(x, ListViewItem)
+            listviewY = CType(y, ListViewItem)
 
-                ' Compare the two items.
-                compareResult = ObjectCompare.Compare(listviewX.SubItems(ColumnToSort).Text, listviewY.SubItems(ColumnToSort).Text)
+            ' Compare the two items.
+            compareResult = ObjectCompare.Compare(listviewX.SubItems(ColumnToSort).Text, listviewY.SubItems(ColumnToSort).Text)
 
-                ' Calculate the correct return value based on the object 
-                ' comparison.
-                If (OrderOfSort = SortOrder.Ascending) Then
-                    ' Ascending sort is selected, return typical result of 
-                    ' compare operation.
-                    Return compareResult
-                ElseIf (OrderOfSort = SortOrder.Descending) Then
-                    ' Descending sort is selected, return negative result of 
-                    ' compare operation.
-                    Return (-compareResult)
-                Else
-                    ' Return '0' to indicate that they are equal.
-                    Return 0
-                End If
-            End Function
+            ' Calculate the correct return value based on the object 
+            ' comparison.
+            If (OrderOfSort = SortOrder.Ascending) Then
+                ' Ascending sort is selected, return typical result of 
+                ' compare operation.
+                Return compareResult
+            ElseIf (OrderOfSort = SortOrder.Descending) Then
+                ' Descending sort is selected, return negative result of 
+                ' compare operation.
+                Return (-compareResult)
+            Else
+                ' Return '0' to indicate that they are equal.
+                Return 0
+            End If
+        End Function
 
-            Public Property SortColumn() As Integer
-                Set(ByVal Value As Integer)
-                    ColumnToSort = Value
-                End Set
+        Public Property SortColumn() As Integer
+            Set(ByVal Value As Integer)
+                ColumnToSort = Value
+            End Set
 
-                Get
-                    Return ColumnToSort
-                End Get
-            End Property
+            Get
+                Return ColumnToSort
+            End Get
+        End Property
 
-            Public Property Order() As SortOrder
-                Set(ByVal Value As SortOrder)
-                    OrderOfSort = Value
-                End Set
+        Public Property Order() As SortOrder
+            Set(ByVal Value As SortOrder)
+                OrderOfSort = Value
+            End Set
 
-                Get
-                    Return OrderOfSort
-                End Get
-            End Property
-        End Class
+            Get
+                Return OrderOfSort
+            End Get
+        End Property
+    End Class
 "@
 #endregion
 
@@ -171,33 +171,42 @@ possibility of such damages.
 
 #region fnConnect
     Function fnConnect {
-        Param ([PSCredential] $Credential)
-
         [Boolean] $continue = $True
 
         $progressBar.Value = 10
         $progressBar.Visible = $True
         $statusLabel.Text = "Connecting to Exchange Online..."
-        $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
+
+        $cloudSession = Get-PSSession | Where-Object {(($_.ComputerName -eq "outlook.office365.com") -or ($_.ComputerName -eq "ps.outlook.com")) -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
         if ($CloudSession) {
 		    Write-Host "Already connected to Exchange Online" -ForegroundColor Blue
             $Global:isConnected = [Boolean] ($CloudSession)
-        }	
-		else {
-            if ($Credential.UserName -eq "dummy") {
+        }
+        else {
+            if ($Global:cloudCred.UserName -eq "dummy") {
                 $result = fnConfigure
                 $continue = ($result -eq [System.Windows.Forms.DialogResult]::OK)
             }
             if ($continue) {
-			    $cloudSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://ps.outlook.com/powershell" -AllowRedirection -Credential $Credential -Authentication Basic
-			    Import-PSSession $cloudSession -CommandName Get-MigrationBatch, Get-MigrationUser, Get-MoveRequestStatistics -AllowClobber
+                if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -eq 0) {
+			        $cloudSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://ps.outlook.com/powershell" -AllowRedirection -Credential $Global:cloudCred -Authentication Basic
+			        Import-PSSession $cloudSession -CommandName Get-Mailbox, Get-MailUser, New-MoveRequest, Get-AcceptedDomain, New-MigrationBatch, Get-MigrationEndpoint, Get-MigrationBatch, Get-MoveRequestStatistics, Get-MigrationUser
 
-                $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
-                $Global:isConnected = [Boolean] ($CloudSession)
+                    $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
+                    $Global:isConnected = [Boolean] ($CloudSession)
+                }
+                else {
+                    Connect-EXOPSSession -UserPrincipalName $Global:cloudCred.UserName
 
+                    $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "outlook.office365.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
+                    $Global:isConnected = [Boolean] ($CloudSession)
+                }
+            }
+            if ($Global:isConnected) {
                 fnLoad
             }
-		}
+        }
+
         $progressBar.Visible = $False
         $statusLabel.Text = ""
         return $continue
@@ -277,6 +286,11 @@ possibility of such damages.
                 if (($txtcloudUser.Text -ne "") -and ($txtcloudPassword.Text -ne "")) {$btnOk.Enabled = $True}
                 else {$btnOk.Enabled = $False}
             })
+            if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -gt 0) {
+                $txtCloudPassword.Enabled = $False
+                $txtCloudPassword.Visible = $False
+                $txtCloudPassword.Text = "dummy"
+            }
         #endregion
 
         #region lblCloudUser
@@ -301,6 +315,10 @@ possibility of such damages.
             $lblCloudPassword.Name = "lblCloudPassword"
             $lblCloudPassword.Size = $drawingSize
             $lblCloudPassword.Text = "Password"
+            if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -gt 0) {
+                $lblCloudPassword.Enabled = $False
+                $lblCloudPassword.Visible = $False
+            }
         #endregion
 
         #region btnOk
