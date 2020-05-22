@@ -161,6 +161,9 @@ possibility of such damages.
         if ($CloudSession) {
 		    Write-Host "Already connected to Exchange Online" -ForegroundColor Blue
             $Global:isConnected = [Boolean] ($CloudSession)
+	    if ($Global:serviceDomain -eq "") {
+	    	$Global:serviceDomain = (Get-AcceptedDomain | Where-Object {$_.DomainName -like "*.mail.onmicrosoft.com"}).DomainName.ToString()
+	    }
         }
         else {
             if ($Global:cloudCred.UserName -eq "dummy") {
