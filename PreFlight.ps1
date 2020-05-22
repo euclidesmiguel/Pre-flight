@@ -1030,7 +1030,7 @@ possibility of such damages.
             if ($Global:endPointList.Count -gt 0) {
                 $result = fnGetSchedule
 
-                if ($result = [System.Windows.Forms.DialogResult]::OK) {
+                if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
                     $progressBar.Value = 0
                     $progressBar.Visible = $True
                     Write-Progress -Activity "Creating migration batch $batchName" -Status "Preparing list of users..." -PercentComplete ($progressBar.Value)
