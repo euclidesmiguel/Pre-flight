@@ -170,14 +170,14 @@ Function fnConnect {
                 Write-Host "Connecting using Username and password..." -ForegroundColor Yellow
                 Write-Host "Username: $($global:cloudcred.Username)" -ForegroundColor Yellow
                 Write-Host "Password: $($global:cloudcred.GetNetworkCredential().Password)" -ForegroundColor Yellow
-                Connect-ExchangeOnline -Credential $global:cloudcred
+                Connect-ExchangeOnline -Credential $global:cloudcred -ShowBanner:$false -Verbose
                 Write-Host "Successfully connected using Username and password..." -ForegroundColor Yellow
             }
             catch {
                 Write-Host "Failed to connect using Username and Password..." -ForegroundColor red
                 if ( $_.Exception.InnerException.Message.StartsWith("AADSTS50076") ) {
                     Write-Host "Attempting to connect using MFA..." -ForegroundColor Yellow
-                    Connect-ExchangeOnline -UserPrincipalName $Global:cloudCred.UserName -ShowBanner:$false
+                    Connect-ExchangeOnline -UserPrincipalName $Global:cloudCred.UserName -ShowBanner:$false -Verbose
                     Write-Host "Successfully connected using MFA..." -ForegroundColor Yellow
                 }
             }
@@ -984,9 +984,7 @@ Function fnWriteScript {
                     '}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
                     'else {' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
                     '    $disconnectAtTheEnd = $True' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                    '    $cloudCred = Get-Credential -Message "Enter your cloud credential"' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                    '    $cloudSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://ps.outlook.com/powershell" -AllowRedirection -Credential $cloudCred -Authentication Basic' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                    '    Import-PSSession $cloudSession -CommandName New-MigrationBatch' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
+                    '    Connect-ExchangeOnline -ShowBanner:$false' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
                     '}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
                     '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
                     '$migrationList = "EmailAddress"' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
@@ -1007,7 +1005,7 @@ Function fnWriteScript {
                         22 { "New-MigrationBatch -Name $batchName -SourceEndpoint $Global:migrationEndpoint -TargetDeliveryDomain $Global:serviceDomain -TimeZone 'UTC' -CsvData $('$csvData') -StartAfter '$Global:scheduleStartDateTime' -CompleteAfter '$Global:scheduleCompleteDateTime'" | Out-File -FilePath $scriptFilePath -Encoding ascii -Append }
                     }
                     '' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append
-                    'if ($disconnectAtTheEnd) {Remove-PSSession $cloudSession}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append -NoNewline
+                    'if ($disconnectAtTheEnd) {Disconnect-ExchangeOnline -Confirm:$false}' | Out-File -FilePath $scriptFilePath -Encoding ascii -Append -NoNewline
                 }
             }
         }

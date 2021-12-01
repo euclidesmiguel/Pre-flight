@@ -27,5 +27,5 @@ later in a Windows Powershell 5.1 run the "Preflight.ps1" file.
 The script requires the "ExchangeOnlineManagement" powershell module. if it is not installed, it will attempt to install it.  
 If the installation fails, please open Windows Powershell with "Run as Administrator".  
 
-# related links  
+# Related links  
 https://docs.microsoft.com/en-us/archive/blogs/fasttracktips/pre-flight-and-migration-tool-update
