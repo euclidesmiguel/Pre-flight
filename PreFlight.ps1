@@ -169,7 +169,6 @@ Function fnConnect {
             try {
                 Write-Host "Connecting using Username and password..." -ForegroundColor Yellow
                 Write-Host "Username: $($global:cloudcred.Username)" -ForegroundColor Yellow
-                Write-Host "Password: $($global:cloudcred.GetNetworkCredential().Password)" -ForegroundColor Yellow
                 Connect-ExchangeOnline -Credential $global:cloudcred -ShowBanner:$false -Verbose
                 Write-Host "Successfully connected using Username and password..." -ForegroundColor Yellow
             }
