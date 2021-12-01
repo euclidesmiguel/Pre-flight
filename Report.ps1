@@ -1,44 +1,28 @@
+#requires -PSEdition "Desktop"
+[CmdletBinding()]
 param ([PSCredential] $Credential = (New-Object System.Management.Automation.PSCredential ("dummy", (ConvertTo-SecureString "dummy" -AsPlainText -Force))))
 
-[string] $version = "0.8"
+[string] $version = "0.9"
 
 <#
-
 .DESCRIPTION
-
-
-
 ###############Disclaimer#####################################################
 
 This is a sample script. The sample scripts are not supported under any 
-
 Microsoft standard support program or service. The sample scripts are 
-
 provided AS IS without warranty of any kind. Microsoft further disclaims all 
-
 implied warranties including, without limitation, any implied warranties of 
-
 merchantability or of fitness for a particular purpose. The entire risk 
-
 arising out of the use or performance of the sample scripts and documentation 
-
 remains with you. In no event shall Microsoft, its authors, or anyone else 
-
 involved in the creation, production, or delivery of the scripts be liable 
-
 for any damages whatsoever (including, without limitation, damages for loss 
-
 of business profits, business interruption, loss of business information, or 
-
 other pecuniary loss) arising out of the use of or inability to use the 
-
 sample scripts or documentation, even if Microsoft has been advised of the 
-
 possibility of such damages.
 
 ###############Disclaimer#####################################################
-
-
 #>
 
 [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
@@ -188,19 +172,20 @@ possibility of such damages.
                 $continue = ($result -eq [System.Windows.Forms.DialogResult]::OK)
             }
             if ($continue) {
-                if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -eq 0) {
-			        $cloudSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://ps.outlook.com/powershell" -AllowRedirection -Credential $Global:cloudCred -Authentication Basic
-			        Import-PSSession $cloudSession -CommandName Get-Mailbox, Get-MailUser, New-MoveRequest, Get-AcceptedDomain, New-MigrationBatch, Get-MigrationEndpoint, Get-MigrationBatch, Get-MoveRequestStatistics, Get-MigrationUser
-
-                    $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
-                    $Global:isConnected = [Boolean] ($CloudSession)
+                if ( -not(Get-Module ExchangeOnlineManagement -ListAvailable) -and -not(Get-Module ExchangeOnlineManagement) ) {
+                    Install-Module ExchangeOnlineManagement -Force -ErrorAction Stop
                 }
-                else {
-                    Connect-EXOPSSession -UserPrincipalName $Global:cloudCred.UserName
-
-                    $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "outlook.office365.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
-                    $Global:isConnected = [Boolean] ($CloudSession)
+                Import-Module ExchangeOnlineManagement
+                try {
+                    Connect-ExchangeOnline -Credential $Global:cloudCred -ShowBanner:$false
                 }
+                catch {
+                    if ( $_.Exception.InnerException.Message.StartsWith("AADSTS50076") ) {
+                        Connect-ExchangeOnline -UserPrincipalName $Global:cloudCred.UserName -ShowBanner:$false
+                    }
+                }
+                $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "outlook.office365.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
+                $Global:isConnected = [Boolean] ($CloudSession)
             }
             if ($Global:isConnected) {
                 fnLoad
@@ -217,7 +202,7 @@ possibility of such damages.
     Function fnDisconnect {
         $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "ps.outlook.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
         if ($cloudSession) {
-            Remove-PSSession $cloudSession
+            Disconnect-ExchangeOnline -Confirm:$false
         }
     }
 #endregion
