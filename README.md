@@ -1,37 +1,31 @@
-## Welcome to GitHub Pages
+# Pre-flight - Checking objects before an Exchange hybrid migration
 
-You can use the [editor on GitHub](https://github.com/euclidesmiguel/Pre-flight/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
+Customers working with FastTrack Center for mail migration can use a tool called Integrated Preflight. It checks for basic migration pre-requisites, such as:  
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+- Does the target object exist in Office 365?
+- Does it have the required e-mail addresses?
+- Are all the e-mail addresses valid?
+- Does the admin account have the required permissions?
+ 
 
-### Markdown
+The Preflight tool does not check everything, but it is a good start and it saves a lot of later time. Here are some things the proposed pre-flight will not check:
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+- Is the user properly licensed?
+- Are there corrupt items in the mailbox?
+- Does the network have enough bandwidth?
+ 
 
-```markdown
-Syntax highlighted code block
+The tool help customers identify potential errors early and fix them before attempting the mailbox migration. Imagine you tell you user “next week you will have a 100 GB mailbox” and that next week you find out that a missing e-mail address prevented the migration. That is what we want to prevent.
 
-# Header 1
-## Header 2
-### Header 3
 
-- Bulleted
-- List
+The Preflight tool, however, is only available to customers using our migration services. But that does not mean you cannot apply the same principles to achieve the same results by yourself: You can use PowerShell to connect to Exchange online and perform the same tests we do.
 
-1. Numbered
-2. List
+# How to use these scripts  
 
-**Bold** and _Italic_ and `Code` text
+Clone or download as a zip this repository.  
+later in a Windows Powershell 5.1 run the "Preflight.ps1" file.  
+The script requires the "ExchangeOnlineManagement" powershell module. if it is not installed, it will attempt to install it.  
+If the installation fails, please open Windows Powershell with "Run as Administrator".  
 
-[Link](url) and ![Image](src)
-```
-
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/euclidesmiguel/Pre-flight/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+# related links  
+https://docs.microsoft.com/en-us/archive/blogs/fasttracktips/pre-flight-and-migration-tool-update
