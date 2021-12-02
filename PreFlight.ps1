@@ -1,5 +1,5 @@
 ﻿Param ([switch] $AutoLoad)
-[string] $version = "1.8.4"
+[string] $version = "1.8.5"
 
 <#
 
@@ -171,7 +171,7 @@ possibility of such damages.
                 $continue = ($result -eq [System.Windows.Forms.DialogResult]::OK)
             }
             if ($continue) {
-                if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -eq 0) {
+                if ((Get-Command Connect-ExchangeOnline -ErrorAction SilentlyContinue).Count -eq 0) {
 			        $cloudSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://ps.outlook.com/powershell" -AllowRedirection -Credential $Global:cloudCred -Authentication Basic
 			        Import-PSSession $cloudSession -CommandName Get-Mailbox, Get-MailUser, New-MoveRequest, Get-AcceptedDomain, New-MigrationBatch, Get-MigrationEndpoint
 
@@ -179,7 +179,7 @@ possibility of such damages.
                     $Global:isConnected = [Boolean] ($CloudSession)
                 }
                 else {
-                    Connect-EXOPSSession -UserPrincipalName $Global:cloudCred.UserName
+                    Connect-ExchangeOnline -UserPrincipalName $Global:cloudCred.UserName
 
                     $cloudSession = Get-PSSession | Where-Object {($_.ComputerName -eq "outlook.office365.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange")}
                     $Global:isConnected = [Boolean] ($CloudSession)
