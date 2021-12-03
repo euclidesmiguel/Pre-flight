@@ -183,6 +183,7 @@ Function fnConnect {
                 Write-Host "Installing EXO module..." -ForegroundColor Yellow
                 Install-Module ExchangeOnlineManagement -Force -ErrorAction Stop
             }
+
             Write-Host "EXO module is installed..." -ForegroundColor Yellow
             Import-Module ExchangeOnlineManagement
             Write-Host "Attempting to connect using Modern Auth..." -ForegroundColor Yellow
