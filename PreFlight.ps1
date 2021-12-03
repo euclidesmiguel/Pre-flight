@@ -166,20 +166,10 @@ Function fnConnect {
             }
             Write-Host "EXO module is installed..." -ForegroundColor Yellow
             Import-Module ExchangeOnlineManagement
-            try {
-                Write-Host "Connecting using Username and password..." -ForegroundColor Yellow
-                Write-Host "Username: $($global:cloudcred.Username)" -ForegroundColor Yellow
-                Connect-ExchangeOnline -Credential $global:cloudcred -ShowBanner:$false -Verbose
-                Write-Host "Successfully connected using Username and password..." -ForegroundColor Yellow
-            }
-            catch {
-                Write-Host "Failed to connect using Username and Password..." -ForegroundColor red
-                if ( $_.Exception.InnerException.Message.StartsWith("AADSTS50076") ) {
-                    Write-Host "Attempting to connect using MFA..." -ForegroundColor Yellow
-                    Connect-ExchangeOnline -UserPrincipalName $Global:cloudCred.UserName -ShowBanner:$false -Verbose
-                    Write-Host "Successfully connected using MFA..." -ForegroundColor Yellow
-                }
-            }
+            Write-Host "Attempting to connect using Modern Auth..." -ForegroundColor Yellow
+            Connect-ExchangeOnline -UserPrincipalName $Global:cloudCred.UserName -ShowBanner:$false -Verbose
+            Write-Host "Successfully connected using Modern Auth..." -ForegroundColor Yellow
+
             $cloudSession = Get-PSSession | Where-Object { ($_.ComputerName -eq "outlook.office365.com") -and ($_.ConfigurationName -eq "Microsoft.Exchange") }
             $Global:isConnected = [Boolean] ($CloudSession)
         }
@@ -320,8 +310,8 @@ Function fnConfigure {
             if (($txtcloudUser.Text -ne "") -and ($txtcloudPassword.Text -ne "")) { $btnOk.Enabled = $True }
             else { $btnOk.Enabled = $False }
         })
-    if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -gt 0) {
-    #if ((Get-Command Connect-ExchangeOnline -ErrorAction SilentlyContinue).Count -gt 0) {
+    #if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -gt 0) {
+    if ((Get-Command Connect-ExchangeOnline -ErrorAction SilentlyContinue).Count -gt 0) {
         $txtCloudPassword.Enabled = $False
         $txtCloudPassword.Visible = $False
         $txtCloudPassword.Text = "dummy"
@@ -386,8 +376,8 @@ Function fnConfigure {
     $lblCloudPassword.Name = "lblCloudPassword"
     $lblCloudPassword.Size = $drawingSize
     $lblCloudPassword.Text = "Password"
-    if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -gt 0) {
-    #if ((Get-Command Connect-ExchangeOnline -ErrorAction SilentlyContinue).Count -gt 0) {
+    #if ((Get-Command Connect-EXOPSSession -ErrorAction SilentlyContinue).Count -gt 0) {
+    if ((Get-Command Connect-ExchangeOnline -ErrorAction SilentlyContinue).Count -gt 0) {
         $lblCloudPassword.Enabled = $False
         $lblCloudPassword.Visible = $False
     }
